@@ -7,7 +7,7 @@ const uint8_t IN_A = 2;
 const uint8_t IN_B = 3;
 const uint8_t IN_C = 4;
 const uint8_t IN_D = 5;
-const uint8_t IN_CLOSED;
+const uint8_t IN_CLOSED = 6;
 
 // output
 
@@ -40,7 +40,7 @@ void setup() {
 
 void loop() {
   
-  u_int8_t nb_choice = get_nb_choice();
+  uint8_t nb_choice = get_nb_choice();
   
   if (digitalRead(IN_CLOSED))
     display_number(nb_choice);
@@ -51,7 +51,7 @@ void loop() {
 }
 
 // functions
-void display_number(short nb)
+void display_number(uint8_t nb)
 {
 
 }
@@ -99,4 +99,5 @@ uint8_t get_nb_choice()
   else  if (a && !b && !c && d)
     return 9;
 
+  return 0;
 }
