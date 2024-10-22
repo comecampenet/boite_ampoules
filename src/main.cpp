@@ -3,84 +3,98 @@
 
 // ##### pins ####
 
+// pin to check if the box is closed
 const uint8_t IN_CLOSED = 4;
 
 // ------output-----
+// pins for each lamp
 const  uint8_t OUTPUTS[15] = {12,13,16,17,18,19,19,21,22,23,25,26,27,32,33};
 
 // #### declarations ####
 
 // ------functions------
-void getDataFromWifi(WiFiClient _client);
-void displayWebPage(WiFiClient client);
+void displayWebPage(WiFiClient _client);
 
 // --------values----------
-// _____wifi & query____
+// _____wifi & query___
+// ssid and pwd
 const char* ssid = "La_Boite_à_Ampoules";
 const char* password = "lejeulalejeu";
+// create the wifi server on port 80
 WiFiServer server(80);
-String header;
-String outputStates[15];
+String header; // store incoming the http header
+String outputStates[15]; //keep each lamp state 
 
 // #### main code ####
 
 // main 
 void setup() {
   Serial.begin(115200);
+  //set modes for each pins and initialize output states
   pinMode(IN_CLOSED,INPUT);
   for (int i = 0; i < 15; i++) {
     pinMode(OUTPUTS[i], OUTPUT);
+    digitalWrite(OUTPUTS[i],LOW);
     outputStates[i] = "off";
   }
 
+  // start the WiFi access point
   Serial.print("Setting AP");
   WiFi.softAP(ssid, password);
 
+  // get and  print the IP adress of the AP 
   IPAddress IP = WiFi.softAPIP();
   Serial.print("AP IP address: ");
   Serial.println(IP);
+  
+  //  start the server
   server.begin();
 }
 
 void loop() {
+  // check for new client and store it as a variable
   WiFiClient client = server.available();
   
+  // if there's a client connected 
   if (client)
   {
+    // notify that there is a client connected
     Serial.println("New Client");
+    // store the current line of the request
     String currentLine = "";
     
     while (client.connected())
     {
+      // check if there's data available to read
       if (client.available())
       {
-        char c = client.read();
-        Serial.write(c);
-        header += c;
-        if (c == '\n')
+        char c = client.read(); // read a byte
+        Serial.write(c);  
+        header += c;  // add the byte to the header variable
+        if (c == '\n') // if it's a newline, we know this is the end of the current line
         {
-          if  (currentLine.length() == 0)
+          if  (currentLine.length() == 0) // if there is nothing in the currentLine
           {
             // http headers start
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/html");
-            client.println("Connection: close");
-            client.println();
+            client.println("HTTP/1.1 200 OK"); // send http status
+            client.println("Content-type:text/html"); // set the content type of the response
+            client.println("Connection: close"); // notify that the connection will be closed
+            client.println(); // end of the headers
 
             // display figure
             for (int i = 0; i < 15; i++)
             {
-              if (header.indexOf("GET /" + String(i) + "/on") >= 0)
+              if (header.indexOf("GET /" + String(i) + "/on") >= 0) // if the i button is asked to be on 
               {
-                Serial.println("lampe " + String(i) + " on");
-                outputStates[i] = "on";
-                digitalWrite(OUTPUTS[i],HIGH);
+                Serial.println("lampe " + String(i) + " on"); // log that it's on
+                outputStates[i] = "on"; // save the status of the lamp
+                digitalWrite(OUTPUTS[i],HIGH); // set on the pin for the lamp
               }
-              else if (header.indexOf("GET /" + String(i) + "/off") >= 0)
+              else if (header.indexOf("GET /" + String(i) + "/off") >= 0) // if the i button is asked to be off
               {
-                Serial.println("lampe " + String(i) + " off");
-                outputStates[i] = "off";
-                digitalWrite(OUTPUTS[i],LOW);
+                Serial.println("lampe " + String(i) + " off"); // log that it's off
+                outputStates[i] = "off"; // save the status  of the lamp
+                digitalWrite(OUTPUTS[i],LOW); //  set off the pin for the lamp
               }
             }
               // display the web page
@@ -88,14 +102,14 @@ void loop() {
 
               // end of the http reponse
               client.println();
-              break;
+              break; // exit the while
           }
           else 
           {
-            currentLine = "";
+            currentLine = ""; // clear the current line for the next iteration
           }
         }
-        else if (c != '\r')
+        else if (c != '\r') // add only bytes that are not carriage return to the current line
         {
           currentLine += c;
         }
@@ -110,36 +124,36 @@ void loop() {
   }
 }
 
-void displayWebPage(WiFiClient client)
+void displayWebPage(WiFiClient _client)
 {
   // ## head ##
-  client.println("<!DOCTYPE html><html lang=\"fr\">");
-  client.println("<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");
-  client.println("<title>Le jeu des ampoules commande</title>");
+  _client.println("<!DOCTYPE html><html lang=\"fr\">");
+  _client.println("<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");
+  _client.println("<title>Le jeu des ampoules commande</title>");
   // __style css__
-  client.println("<style> body { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: Arial, sans-serif; }");
-  client.println("h1 { font-size: 2em; color: #333; margin: 10px 0;}");
-  client.println("p { font-size: 1.2em; color: #555; text-align: center; margin: 0 0 20px 0; }");
-  client.println(".grid { display: grid; grid-template-columns: repeat(3, 100px); grid-template-rows: repeat(5, 100px); gap: 10px; }");
-  client.println("a { text-decoration: none; }");
-  client.println("button { width: 100px; height: 100px; color: white; border: none; border-radius: 40px; cursor: pointer; font-size: 16px; transition: 0.3s; }");
-  client.println("button:hover { background: #DAA520 !important; }</style></head>");
+  _client.println("<style> body { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: Arial, sans-serif; }");
+  _client.println("h1 { font-size: 2em; color: #333; margin: 10px 0;}");
+  _client.println("p { font-size: 1.2em; color: #555; text-align: center; margin: 0 0 20px 0; }");
+  _client.println(".grid { display: grid; grid-template-columns: repeat(3, 100px); grid-template-rows: repeat(5, 100px); gap: 10px; }");
+  _client.println("a { text-decoration: none; }");
+  _client.println("button { width: 100px; height: 100px; color: white; border: none; border-radius: 40px; cursor: pointer; font-size: 16px; transition: 0.3s; }");
+  _client.println("button:hover { background: #DAA520 !important; }</style></head>");
   // __body page__
-  client.println("<body><h1>Le jeu des ampoules</h1>");
-  client.println("<p>Cliquez sur les boutons pour allumer les lampes</p>");
+  _client.println("<body><h1>Le jeu des ampoules</h1>");
+  _client.println("<p>Cliquez sur les boutons pour allumer les lampes</p>");
   // button grid
-  client.println("<div class=\"grid\">");
+  _client.println("<div class=\"grid\">");
   for (int i = 0; i < 15; i++)
   {
     if(outputStates[i] == "on")
     {
-      client.println("<a href=\"/" + String(i) + "/off\"><button style=\"background: #FFD700;\">L" + String(i) + "</button></a>");
+      _client.println("<a href=\"/" + String(i) + "/off\"><button style=\"background: #FFD700;\">L" + String(i) + "</button></a>");
     }
     else if (outputStates[i] == "off")
     {
-      client.println("<a href=\"/" + String(i) + "/on\"><button style=\"background: #555555;\">L" + String(i) + "</button></a>");
+      _client.println("<a href=\"/" + String(i) + "/on\"><button style=\"background: #555555;\">L" + String(i) + "</button></a>");
     }
   }
-  client.println("</div>");
-  client.println("</body></html>");
+  _client.println("</div>");
+  _client.println("</body></html>");
 }
