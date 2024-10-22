@@ -136,7 +136,7 @@ void displayWebPage(WiFiClient _client)
   _client.println("p { font-size: 1.2em; color: #555; text-align: center; margin: 0 0 20px 0; }");
   _client.println(".grid { display: grid; grid-template-columns: repeat(3, 100px); grid-template-rows: repeat(5, 100px); gap: 10px; }");
   _client.println("a { text-decoration: none; }");
-  _client.println("button { width: 100px; height: 100px; color: white; border: none; border-radius: 40px; cursor: pointer; font-size: 16px; transition: 0.3s; }");
+  _client.println("button { width: 100px; height: 100px; color: white; border: none; border-radius: 40px; cursor: pointer; font-size: 16px; transition: 0.5s; }");
   _client.println("button:hover { background: #DAA520 !important; }</style></head>");
   // __body page__
   _client.println("<body><h1>Le jeu des ampoules</h1>");
