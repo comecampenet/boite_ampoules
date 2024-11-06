@@ -8,7 +8,7 @@ const uint8_t IN_CLOSED = 4;
 
 // ------output-----
 // pins for each lamp
-const  uint8_t OUTPUTS[15] = {12,13,16,17,18,19,19,21,22,23,25,26,27,32,33};
+const  uint8_t OUTPUTS[15] = {12, 13, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33, 34};
 
 // #### declarations ####
 
@@ -17,9 +17,11 @@ void displayWebPage(WiFiClient _client);
 
 // --------values----------
 // _____wifi & query___
+
 // ssid and pwd
 const char* ssid = "La_Boite_à_Ampoules";
 const char* password = "lejeulalejeu";
+
 // create the wifi server on port 80
 WiFiServer server(80);
 String header; // store incoming the http header
@@ -32,6 +34,7 @@ void setup() {
   Serial.begin(115200);
   //set modes for each pins and initialize output states
   pinMode(IN_CLOSED,INPUT);
+
   for (int i = 0; i < 15; i++) {
     pinMode(OUTPUTS[i], OUTPUT);
     digitalWrite(OUTPUTS[i],LOW);
@@ -86,15 +89,13 @@ void loop() {
             {
               if (header.indexOf("GET /" + String(i) + "/on") >= 0) // if the i button is asked to be on 
               {
-                Serial.println("lampe " + String(i) + " on"); // log that it's on
+                Serial.println("lampe " + String(i) + " commanded to be on"); // log that it's on
                 outputStates[i] = "on"; // save the status of the lamp
-                digitalWrite(OUTPUTS[i],HIGH); // set on the pin for the lamp
               }
               else if (header.indexOf("GET /" + String(i) + "/off") >= 0) // if the i button is asked to be off
               {
-                Serial.println("lampe " + String(i) + " off"); // log that it's off
+                Serial.println("lampe " + String(i) + "commanded to be off"); // log that it's off
                 outputStates[i] = "off"; // save the status  of the lamp
-                digitalWrite(OUTPUTS[i],LOW); //  set off the pin for the lamp
               }
             }
               // display the web page
@@ -122,6 +123,31 @@ void loop() {
     client.stop();
     Serial.println("Client disconnected");
   }
+
+  // turn on and off the lights
+  if (digitalRead(IN_CLOSED) == true)
+  {
+    for  (int i = 0; i < 15; i++)
+    {
+      if (outputStates[i] == "on")
+      {
+        digitalWrite(OUTPUTS[i],HIGH); // set on the pin for the lamp
+        Serial.println("L" +  String(i) + " is on");
+      }
+      else if (outputStates[i] == "off")
+      {
+        digitalWrite(OUTPUTS[i],LOW); // set off the pin for the lamp
+      }
+    }
+  }
+  else if (digitalRead(IN_CLOSED) == false)
+  {
+    for  (int i = 0; i < 15; i++)
+    {
+      digitalWrite(OUTPUTS[i],LOW); // set off the pin for the lamp
+    }
+  }
+  delay(500);
 }
 
 void displayWebPage(WiFiClient _client)
