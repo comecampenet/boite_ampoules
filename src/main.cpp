@@ -4,11 +4,11 @@
 // ##### pins ####
 
 // pin to check if the box is closed
-const uint8_t IN_CLOSED = 4;
+const uint8_t IN_CLOSED = 34;
 
 // ------output-----
 // pins for each lamp
-const  uint8_t OUTPUTS[15] = {12, 13, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33, 34};
+const  uint8_t OUTPUTS[15] = {4, 13, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33, 5};
 
 // #### declarations ####
 
@@ -19,7 +19,7 @@ void displayWebPage(WiFiClient _client);
 // _____wifi & query___
 
 // ssid and pwd
-const char* ssid = "La_Boite_à_Ampoules";
+const char* ssid = "La_Boite_Ampoules";
 const char* password = "lejeulalejeu";
 
 // create the wifi server on port 80
@@ -37,7 +37,7 @@ void setup() {
 
   for (int i = 0; i < 15; i++) {
     pinMode(OUTPUTS[i], OUTPUT);
-    digitalWrite(OUTPUTS[i],LOW);
+    digitalWrite(OUTPUTS[i],HIGH);
     outputStates[i] = "off";
   }
 
@@ -131,12 +131,12 @@ void loop() {
     {
       if (outputStates[i] == "on")
       {
-        digitalWrite(OUTPUTS[i],HIGH); // set on the pin for the lamp
+        digitalWrite(OUTPUTS[i],LOW); // set on the pin for the lamp (inversion sue to the circuit)
         Serial.println("L" +  String(i) + " is on");
       }
       else if (outputStates[i] == "off")
       {
-        digitalWrite(OUTPUTS[i],LOW); // set off the pin for the lamp
+        digitalWrite(OUTPUTS[i],HIGH); // set off the pin for the lamp (inversion sue to the circuit)
       }
     }
   }
