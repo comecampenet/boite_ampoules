@@ -125,7 +125,7 @@ void loop() {
   }
 
   // turn on and off the lights
-  if (digitalRead(IN_CLOSED) == true)
+  if (digitalRead(IN_CLOSED) == HIGH)
   {
     for  (int i = 0; i < 15; i++)
     {
@@ -140,7 +140,7 @@ void loop() {
       }
     }
   }
-  else if (digitalRead(IN_CLOSED) == false)
+  else if (digitalRead(IN_CLOSED) == LOW)
   {
     for  (int i = 0; i < 15; i++)
     {
