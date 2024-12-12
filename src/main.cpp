@@ -37,7 +37,6 @@ void setup() {
 
   for (int i = 0; i < 15; i++) {
     pinMode(OUTPUTS[i], OUTPUT);
-    digitalWrite(OUTPUTS[i],HIGH);
     outputStates[i] = "off";
   }
 
@@ -144,7 +143,7 @@ void loop() {
   {
     for  (int i = 0; i < 15; i++)
     {
-      digitalWrite(OUTPUTS[i],LOW); // set off the pin for the lamp
+      digitalWrite(OUTPUTS[i],HIGH); // set off the pin for the lamp
     }
   }
   delay(500);
