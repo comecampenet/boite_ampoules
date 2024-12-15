@@ -37,6 +37,8 @@ void setup() {
 
   for (int i = 0; i < 15; i++) {
     pinMode(OUTPUTS[i], OUTPUT);
+    delay(10);
+    digitalWrite(OUTPUTS[i],HIGH); // set off the pin for the lamp
     outputStates[i] = "off";
   }
 
@@ -137,6 +139,7 @@ void loop() {
       {
         digitalWrite(OUTPUTS[i],HIGH); // set off the pin for the lamp (inversion sue to the circuit)
       }
+      delay(10);
     }
   }
   else if (digitalRead(IN_CLOSED) == LOW)
@@ -144,6 +147,8 @@ void loop() {
     for  (int i = 0; i < 15; i++)
     {
       digitalWrite(OUTPUTS[i],HIGH); // set off the pin for the lamp
+    delay(10);
+
     }
   }
   delay(500);
