@@ -34,7 +34,7 @@ In the project , we used the following hardware:
 
 - Electronics circuit (this schematic is dupilcated 15 times, one for each light bulb):
 
-![circuit](circuit.png)
+![circuit](./circuit.png)
 
 ## Software Requirements
 
