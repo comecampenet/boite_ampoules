@@ -25,7 +25,9 @@ const char* password = "lejeulalejeu";
 // create the wifi server on port 80
 WiFiServer server(80);
 String header; // store incoming the http header
-String outputStates[15]; //keep each lamp state 
+
+// memory state
+bool outputStates[15]; //keep each lamp state 
 
 // #### main code ####
 
@@ -37,9 +39,9 @@ void setup() {
 
   for (int i = 0; i < 15; i++) {
     pinMode(OUTPUTS[i], OUTPUT);
-    delay(10);
+    delay(3);
     digitalWrite(OUTPUTS[i],HIGH); // set off the pin for the lamp
-    outputStates[i] = "off";
+    outputStates[i] = false;
   }
 
   // start the WiFi access point
@@ -91,12 +93,12 @@ void loop() {
               if (header.indexOf("GET /" + String(i) + "/on") >= 0) // if the i button is asked to be on 
               {
                 Serial.println("lampe " + String(i) + " commanded to be on"); // log that it's on
-                outputStates[i] = "on"; // save the status of the lamp
+                outputStates[i] = true; // save the status of the lamp
               }
               else if (header.indexOf("GET /" + String(i) + "/off") >= 0) // if the i button is asked to be off
               {
                 Serial.println("lampe " + String(i) + "commanded to be off"); // log that it's off
-                outputStates[i] = "off"; // save the status  of the lamp
+                outputStates[i] = false; // save the status  of the lamp
               }
             }
               // display the web page
@@ -130,16 +132,16 @@ void loop() {
   {
     for  (int i = 0; i < 15; i++)
     {
-      if (outputStates[i] == "on")
+      if (outputStates[i] == true)
       {
         digitalWrite(OUTPUTS[i],LOW); // set on the pin for the lamp (inversion sue to the circuit)
         Serial.println("L" +  String(i) + " is on");
       }
-      else if (outputStates[i] == "off")
+      else if (outputStates[i] == false)
       {
         digitalWrite(OUTPUTS[i],HIGH); // set off the pin for the lamp (inversion sue to the circuit)
       }
-      delay(10);
+      delay(3);
     }
   }
   else if (digitalRead(IN_CLOSED) == LOW)
@@ -147,11 +149,11 @@ void loop() {
     for  (int i = 0; i < 15; i++)
     {
       digitalWrite(OUTPUTS[i],HIGH); // set off the pin for the lamp
-    delay(10);
+    delay(3);
 
     }
   }
-  delay(500);
+  delay(200);
 }
 
 void displayWebPage(WiFiClient _client)
@@ -175,11 +177,11 @@ void displayWebPage(WiFiClient _client)
   _client.println("<div class=\"grid\">");
   for (int i = 0; i < 15; i++)
   {
-    if(outputStates[i] == "on")
+    if(outputStates[i] == true)
     {
       _client.println("<a href=\"/" + String(i) + "/off\"><button style=\"background: #FFD700;\">L" + String(i) + "</button></a>");
     }
-    else if (outputStates[i] == "off")
+    else if (outputStates[i] == false)
     {
       _client.println("<a href=\"/" + String(i) + "/on\"><button style=\"background: #555555;\">L" + String(i) + "</button></a>");
     }
