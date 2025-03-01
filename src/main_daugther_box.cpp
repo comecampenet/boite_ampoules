@@ -31,18 +31,62 @@ const uint8_t notificationOff[] = {0x0, 0x0};
 bool newStatus = false;
 const char* bleServerName = "Mother Light Box";
 
+//Callback function that gets called, when another device's advertisement has been received
+class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
+	void onResult(BLEAdvertisedDevice advertisedDevice) {
+	  if (advertisedDevice.getName() == bleServerName) { //Check if the name of the advertiser matches
+		advertisedDevice.getScan()->stop(); //Scan can be stopped, we found what we are looking for
+		pServerAddress = new BLEAddress(advertisedDevice.getAddress()); //Address of advertiser is the one we need
+		doConnect = true; //Set indicator, stating that we are ready to connect
+		Serial.println("Device found. Connecting!");
+		}
+	}
+};
+
 // ____ functions ____
 
+void setupBLE();
+void updateLightStatus();
 bool connectToServer(BLEAddress pAddress);
+static void lightStatusNotifyCallBack(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
 
 void setup()
 {
+	Serial.begin(115200);
+	
+	setupBLE();
 
 }
 
 void loop()
 {
+	updateLightStatus();
+}
 
+void setupBLE()
+{
+	BLEDevice::init("");
+	BLEScan* pBLEScan = BLEDevice::getScan();
+	pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
+	pBLEScan->setActiveScan(true);
+	pBLEScan->start(30);
+}
+
+void updateLightStatus()
+{
+	if (doConnect == true)
+	{
+		if (connectToServer(*pServerAddress))
+		{
+			lightStatusCharacteristic->getDescriptor(BLEUUID((uint16_t)0x2902))->writeValue((uint8_t*)notificationOn, 2, true);
+			connected = true;
+		}
+		else
+		{
+			Serial.println("failed to connect to the server, restart the device");
+		}
+		doConnect = false;
+	}
 }
 
 bool connectToServer(BLEAddress pAdress)
@@ -63,4 +107,10 @@ bool connectToServer(BLEAddress pAdress)
 	Serial.println(" - Found our characteristics");
 	lightStatusCharacteristic->registerForNotify(lightStatusNotifyCallback);
 	return true;
+}
+
+static void lightStatusNotifyCallBack(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify)
+{
+	lightStatus = pData;
+	newStatus = true;
 }
