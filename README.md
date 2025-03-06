@@ -1,6 +1,6 @@
 # La Boîte à Ampoules
 
-Welcome to **La Boîte à Ampoules**! This project is part of **DeepRed** by **Fondation INP** with the support of **Lynred**. This is a school project lead by Côme Campenet, Paul Fauvernier, Léo Scholé, and Alexandre Veyret.
+Welcome to **La Boîte à Ampoules**! This project is part of **DeepRed** by **Fondation INP** with the support of **Lynred**. This is a school project lead by Côme Campenet, Paul Fauvernier, Léo Schorlé, and Alexandre Veyret.
 
 This project in large point of view is a test of an escape game using infrared technologies. The test is a box that contains a 3*5 light bulb matrix. When the box is open the lights are all off and when the box is closed the some of the light are turned on, drawing a code useful for the next test. The fact is that the light bulbs are heating when on so it's emmtiting infrared light even when they are turned off. This is the reason why we need to use an infrared camera to read the code when the box is open.
 ## Table of Contents
