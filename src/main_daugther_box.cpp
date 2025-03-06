@@ -49,6 +49,7 @@ void setupBLE();
 void updateLightStatus();
 bool connectToServer(BLEAddress pAddress);
 static void lightStatusNotifyCallBack(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
+void updateButtonStatus();
 
 void setup()
 {
@@ -114,3 +115,17 @@ static void lightStatusNotifyCallBack(BLERemoteCharacteristic* pBLERemoteCharact
 	lightStatus = pData;
 	newStatus = true;
 }
+
+
+
+/* Deutsche Qualität */
+void updateButtonStatus() {
+    // Tableau des numéros de pins associés aux boutons (jsp exactement si c'est bien ça les bons pins t'y as capté)
+    const int buttonPins[15] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+    
+    for (int i = 0; i < 15; i++) {
+		// Met à jour le statut du bouton, càd si c'est égal à HIGH ça vaut 1, sinon 0. (normalement ça devrait marcher)
+        lightStatus[i] = (digitalRead(buttonPins[i]) == HIGH);
+    }
+}
+
