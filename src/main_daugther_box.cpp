@@ -8,7 +8,9 @@
 
 // ### declarations ###
 
-bool lightStatus[15]; //keep each lamp state 
+bool lightStatus[15]; //keep each lamp state
+// Tableau des numéros de pins associés aux boutons (jsp exactement si c'est bien ça les bons pins t'y as capté)
+const int buttonPins[15] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
 
 // ____BLE____
 const char* serviceUUID = "19B10000-E8F2-537E-4F6C-D104768A1214";
@@ -50,6 +52,8 @@ void updateLightStatus();
 bool connectToServer(BLEAddress pAddress);
 static void lightStatusNotifyCallBack(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
 void updateButtonStatus();
+void compareButtonAndLightStatus();
+
 
 void setup()
 {
@@ -62,6 +66,8 @@ void setup()
 void loop()
 {
 	updateLightStatus();
+	updateButtonStatus();
+	compareButtonAndLightStatus();
 }
 
 void setupBLE()
@@ -120,12 +126,22 @@ static void lightStatusNotifyCallBack(BLERemoteCharacteristic* pBLERemoteCharact
 
 /* Deutsche Qualität */
 void updateButtonStatus() {
-    // Tableau des numéros de pins associés aux boutons (jsp exactement si c'est bien ça les bons pins t'y as capté)
-    const int buttonPins[15] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
-    
     for (int i = 0; i < 15; i++) {
 		// Met à jour le statut du bouton, càd si c'est égal à HIGH ça vaut 1, sinon 0. (normalement ça devrait marcher)
         lightStatus[i] = (digitalRead(buttonPins[i]) == HIGH);
     }
 }
 
+void compareButtonAndLightStatus() {
+    for (int i = 0; i < 15; i++) {
+        if (lightStatus[i] != (digitalRead(buttonPins[i]) == HIGH)) {
+		/* jsp si ça marche ça */
+            	Serial.println("Incohérence à l'index %d",i);
+		
+		/* ça revient à faire ça normalement
+		Serial.print("Incohérence à l'index");
+		Serial.println(i);
+		*/
+        }
+    }
+}
