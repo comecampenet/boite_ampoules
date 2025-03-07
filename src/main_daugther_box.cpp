@@ -5,12 +5,15 @@
 #include <BLEServer.h>
 
 // ### pins ###
-
-// ### declarations ###
-
-bool lightStatus[15]; //keep each lamp state
+// Pin qui actionne l'ouverture de la boîte (faudra mettre le bon pin du coup)
+const int unlockPin = 42;
 // Tableau des numéros de pins associés aux boutons (jsp exactement si c'est bien ça les bons pins t'y as capté)
 const int buttonPins[15] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+
+// ### declarations ###
+bool lightStatus[15]; //keep each lamp state
+int enteredCode[15]; // Stocke le code entré par l'utilisateur
+const int correctCode[15] = {1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1}; // Code attendu
 
 // ____BLE____
 const char* serviceUUID = "19B10000-E8F2-537E-4F6C-D104768A1214";
@@ -53,11 +56,16 @@ bool connectToServer(BLEAddress pAddress);
 static void lightStatusNotifyCallBack(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
 void updateButtonStatus();
 void compareButtonAndLightStatus();
+bool checkCode();
+void unlockBox();
 
 
 void setup()
 {
 	Serial.begin(115200);
+
+	pinMode(unlockPin, OUTPUT);
+    	digitalWrite(unlockPin, LOW); // S'assurer que le pin est bas au départ
 	
 	setupBLE();
 
@@ -68,6 +76,9 @@ void loop()
 	updateLightStatus();
 	updateButtonStatus();
 	compareButtonAndLightStatus();
+	if (checkCode()) {
+        	unlockBox();
+    	}
 }
 
 void setupBLE()
@@ -144,4 +155,20 @@ void compareButtonAndLightStatus() {
 		*/
         }
     }
+}
+
+bool checkCode() {
+    for (int i = 0; i < 15; i++) {
+        if (enteredCode[i] != correctCode[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void unlockBox() {
+    Serial.println("Code correct, ouverture de la boîte !");
+    digitalWrite(unlockPin, HIGH);
+    delay(5000); // Maintenir l'ouverture 5 secondes
+    digitalWrite(unlockPin, LOW);
 }
