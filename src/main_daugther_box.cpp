@@ -6,7 +6,7 @@
 
 // ### pins ###
 // Pin qui actionne l'ouverture de la boîte (faudra mettre le bon pin du coup)
-const int unlockPin = 42;
+const int unlockPin = #####################;
 // Tableau des numéros de pins associés aux boutons (jsp exactement si c'est bien ça les bons pins t'y as capté)
 const int buttonPins[15] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
 
@@ -75,10 +75,11 @@ void loop()
 {
 	updateLightStatus();
 	updateButtonStatus();
-	compareButtonAndLightStatus();
+	//compareButtonAndLightStatus();
 	if (checkCode()) {
-        	unlockBox();
-    	}
+      unlockBox();
+  }
+	delay(250);
 }
 
 void setupBLE()
@@ -133,8 +134,6 @@ static void lightStatusNotifyCallBack(BLERemoteCharacteristic* pBLERemoteCharact
 	newStatus = true;
 }
 
-
-
 /* Deutsche Qualität */
 void updateButtonStatus() {
     for (int i = 0; i < 15; i++) {
@@ -146,8 +145,8 @@ void updateButtonStatus() {
 void compareButtonAndLightStatus() {
     for (int i = 0; i < 15; i++) {
         if (lightStatus[i] != (digitalRead(buttonPins[i]) == HIGH)) {
-		/* jsp si ça marche ça */
-            	Serial.println("Incohérence à l'index %d",i);
+				/* jsp si ça marche ça */
+						Serial.println("Incohérence à l'index %d",i);
 		
 		/* ça revient à faire ça normalement
 		Serial.print("Incohérence à l'index");
