@@ -1,164 +1,151 @@
 #include <Arduino.h>
-// #include <ArduinoBLE.h> not working on esp32
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
 
-// ### pins ###
-// Pin qui actionne l'ouverture de la boîte (faudra mettre le bon pin du coup)
-const int unlockPin = #####################;
-// Tableau des numéros de pins associés aux boutons (jsp exactement si c'est bien ça les bons pins t'y as capté)
+// ### Pins ###
+const int unlockPin = 22;
 const int buttonPins[15] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
 
-// ### declarations ###
-bool lightStatus[15]; //keep each lamp state
-int enteredCode[15]; // Stocke le code entré par l'utilisateur
-const int correctCode[15] = {1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1}; // Code attendu
+// ### Declarations ###
+bool lightStatus[15] = {0};  // Correct code (received via BLE)
+int enteredCode[15] = {0};   // Code entered by the user
 
 // ____BLE____
 const char* serviceUUID = "19B10000-E8F2-537E-4F6C-D104768A1214";
 const char* lightStatusCharacteristicUUID = "19B10001-E8F2-537E-4F6C-D104768A1214";
 
-//Flags stating if should begin connecting and if the connection is up
 static boolean doConnect = false;
 static boolean connected = false;
-
-//Address of the peripheral device. Address will be found during scanning...
-static BLEAddress *pServerAddress;
-
-// remote characteristics
-static BLERemoteCharacteristic* lightStatusCharacteristic
-
-//Activate notify
-const uint8_t notificationOn[] = {0x1, 0x0};
-const uint8_t notificationOff[] = {0x0, 0x0};
-
+static BLEAddress* pServerAddress = nullptr;
+static BLERemoteCharacteristic* lightStatusCharacteristic = nullptr;
 bool newStatus = false;
 const char* bleServerName = "Mother Light Box";
 
-//Callback function that gets called, when another device's advertisement has been received
-class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
-	void onResult(BLEAdvertisedDevice advertisedDevice) {
-	  if (advertisedDevice.getName() == bleServerName) { //Check if the name of the advertiser matches
-		advertisedDevice.getScan()->stop(); //Scan can be stopped, we found what we are looking for
-		pServerAddress = new BLEAddress(advertisedDevice.getAddress()); //Address of advertiser is the one we need
-		doConnect = true; //Set indicator, stating that we are ready to connect
-		Serial.println("Device found. Connecting!");
-		}
-	}
+// Activation des notifications
+const uint8_t notificationOn[] = {0x1, 0x0};
+const uint8_t notificationOff[] = {0x0, 0x0};
+
+// Callback de scan BLE
+class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
+    void onResult(BLEAdvertisedDevice advertisedDevice) {
+        if (advertisedDevice.getName() == bleServerName) {
+            advertisedDevice.getScan()->stop();
+            pServerAddress = new BLEAddress(advertisedDevice.getAddress());
+            doConnect = true;
+            Serial.println("Device found. Connecting!");
+        }
+    }
 };
 
-// ____ functions ____
+// Callback de notification BLE (updates lightStatus)
+static void lightStatusNotifyCallBack(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
+    if (length == 15) {
+        memcpy(lightStatus, pData, length);
+        newStatus = true;
 
+        // Debugging: Print updated lightStatus array
+        Serial.print("Updated lightStatus: ");
+        for (int i = 0; i < 15; i++) {
+            Serial.print(lightStatus[i]);
+            Serial.print(" ");
+        }
+        Serial.println();
+    }
+}
+
+// ____ Fonctions ____
 void setupBLE();
 void updateLightStatus();
 bool connectToServer(BLEAddress pAddress);
-static void lightStatusNotifyCallBack(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify);
 void updateButtonStatus();
-void compareButtonAndLightStatus();
 bool checkCode();
 void unlockBox();
 
+void setup() {
+    Serial.begin(115200);
+    pinMode(unlockPin, OUTPUT);
+    digitalWrite(unlockPin, LOW);
 
-void setup()
-{
-	Serial.begin(115200);
+    for (int i = 0; i < 15; i++) {
+        pinMode(buttonPins[i], INPUT_PULLUP);
+    }
 
-	pinMode(unlockPin, OUTPUT);
-    	digitalWrite(unlockPin, LOW); // S'assurer que le pin est bas au départ
-	
-	setupBLE();
-
+    setupBLE();
 }
 
-void loop()
-{
-	updateLightStatus();
-	updateButtonStatus();
-	//compareButtonAndLightStatus();
-	if (checkCode()) {
-      unlockBox();
-  }
-	delay(250);
+void loop() {
+    updateLightStatus();
+    updateButtonStatus();
+
+    if (checkCode()) {
+        unlockBox();
+    }
+
+    delay(250);
 }
 
-void setupBLE()
-{
-	BLEDevice::init("");
-	BLEScan* pBLEScan = BLEDevice::getScan();
-	pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-	pBLEScan->setActiveScan(true);
-	pBLEScan->start(30);
+void setupBLE() {
+    BLEDevice::init("");
+    BLEScan* pBLEScan = BLEDevice::getScan();
+    pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
+    pBLEScan->setActiveScan(true);
+    pBLEScan->start(30);
 }
 
-void updateLightStatus()
-{
-	if (doConnect == true)
-	{
-		if (connectToServer(*pServerAddress))
-		{
-			lightStatusCharacteristic->getDescriptor(BLEUUID((uint16_t)0x2902))->writeValue((uint8_t*)notificationOn, 2, true);
-			connected = true;
-		}
-		else
-		{
-			Serial.println("failed to connect to the server, restart the device");
-		}
-		doConnect = false;
-	}
+void updateLightStatus() {
+    if (doConnect && pServerAddress != nullptr) {
+        if (connectToServer(*pServerAddress)) {
+            lightStatusCharacteristic->getDescriptor(BLEUUID((uint16_t)0x2902))->writeValue((uint8_t*)notificationOn, 2, true);
+            connected = true;
+        } else {
+            Serial.println("Failed to connect to the server, restart the device.");
+        }
+        doConnect = false;
+    }
 }
 
-bool connectToServer(BLEAddress pAdress)
-{
-	BLEClient pClient = BLEDevice::createClient();
-	pClient.connect(pAdress);
-	BLERemoteService* pRemoteService->getService(serviceUUID);
-	if (pRemoteService == nullptr)
-	{
-		Serial.println("can't find the service");
-		return false;
-	}
-	lightStatusCharacteristic = pRemoteService->getCharacteristic(lightStatusCharacteristicUUID)
-	if (temperatureCharacteristic == nullptr || humidityCharacteristic == nullptr) {
-		Serial.print("Failed to find our characteristic UUID");
-		return false;
-	}
-	Serial.println(" - Found our characteristics");
-	lightStatusCharacteristic->registerForNotify(lightStatusNotifyCallback);
-	return true;
+bool connectToServer(BLEAddress pAdress) {
+    BLEClient* pClient = BLEDevice::createClient();
+    if (!pClient->connect(pAdress)) {
+        Serial.println("Failed to connect to BLE server.");
+        return false;
+    }
+
+    BLERemoteService* pRemoteService = pClient->getService(serviceUUID);
+    if (pRemoteService == nullptr) {
+        Serial.println("Can't find the service.");
+        return false;
+    }
+
+    lightStatusCharacteristic = pRemoteService->getCharacteristic(lightStatusCharacteristicUUID);
+    if (lightStatusCharacteristic == nullptr) {
+        Serial.println("Failed to find characteristic UUID.");
+        return false;
+    }
+
+    Serial.println(" - Found our characteristics");
+    lightStatusCharacteristic->registerForNotify(lightStatusNotifyCallBack);
+    return true;
 }
 
-static void lightStatusNotifyCallBack(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify)
-{
-	lightStatus = pData;
-	newStatus = true;
-}
-
-/* Deutsche Qualität */
 void updateButtonStatus() {
     for (int i = 0; i < 15; i++) {
-		// Met à jour le statut du bouton, càd si c'est égal à HIGH ça vaut 1, sinon 0. (normalement ça devrait marcher)
-        lightStatus[i] = (digitalRead(buttonPins[i]) == HIGH);
+        enteredCode[i] = digitalRead(buttonPins[i]) == LOW ? 1 : 0;
     }
-}
 
-void compareButtonAndLightStatus() {
+    // Debugging: Print enteredCode
+    Serial.print("Entered code: ");
     for (int i = 0; i < 15; i++) {
-        if (lightStatus[i] != (digitalRead(buttonPins[i]) == HIGH)) {
-				/* jsp si ça marche ça */
-						Serial.println("Incohérence à l'index %d",i);
-		
-		/* ça revient à faire ça normalement
-		Serial.print("Incohérence à l'index");
-		Serial.println(i);
-		*/
-        }
+        Serial.print(enteredCode[i]);
+        Serial.print(" ");
     }
+    Serial.println();
 }
 
 bool checkCode() {
     for (int i = 0; i < 15; i++) {
-        if (enteredCode[i] != correctCode[i]) {
+        if (enteredCode[i] != lightStatus[i]) {
             return false;
         }
     }
@@ -168,6 +155,6 @@ bool checkCode() {
 void unlockBox() {
     Serial.println("Code correct, ouverture de la boîte !");
     digitalWrite(unlockPin, HIGH);
-    delay(5000); // Maintenir l'ouverture 5 secondes
+    delay(5000);
     digitalWrite(unlockPin, LOW);
 }
