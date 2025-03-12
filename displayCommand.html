@@ -6,7 +6,7 @@
     <title>Contrôleur Jeu des Ampoulles</title>
     <style>
         body { font-family: Arial, sans-serif; text-align: center; }
-        .container { display: flex; justify-content: center; gap: 2vw; margin-top: 3vw; border-radius: 25px; overflow: hidden; }
+        .container { display: flex; justify-content: center; gap: 2em; margin-top: 2em; border-radius: 25px; overflow: hidden; }
         .code-table { border-collapse: collapse;}
         .code-table td { width: 2.5em; height: 2.5em; text-align: center; border: 0.5em solid #ccc;}
         .code-table .on { background-color: gold; }
@@ -17,9 +17,9 @@
         .code-table-editable .on { background-color: gold; }
         .code-table-editable .off { background-color: gray; }
         .side-section {display: flex; flex-direction: column;}
-        .send-button {margin-top:2em; background-color: #CE2029;  color: white; /* Text color */    padding: 10px 20px; /* Padding */    font-size: 16px; /* Font size */    border: none; /* Remove default border */    border-radius: 5px; /* Rounded corners */    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2); /* Shadow */    cursor: pointer; /* Pointer cursor */    text-align: center; /* Center text */ transition: background-color 0.3s; /* Transition effect */}
-        .encode-button {margin-top:2em; background-color: #DAA520;  color: white; /* Text color */    padding: 10px 20px; /* Padding */    font-size: 16px; /* Font size */    border: none; /* Remove default border */    border-radius: 5px; /* Rounded corners */    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2); /* Shadow */    cursor: pointer; /* Pointer cursor */    text-align: center; /* Center text */ transition: background-color 0.3s; /* Transition effect */}
-        .option-button {margin-top:1em; background-color: #20cec5;  color: white; /* Text color */    padding: 10px 20px; /* Padding */    font-size: 16px; /* Font size */    border: none; /* Remove default border */    border-radius: 5px; /* Rounded corners */    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2); /* Shadow */    cursor: pointer; /* Pointer cursor */    text-align: center; /* Center text */ transition: background-color 0.3s; /* Transition effect */}
+        .send-button {margin-top:2em; background-color: #CE2029;  color: white; /* Text color */    padding: 0.6em 2em; /* Padding */    font-size: 1em; /* Font size */    border: none; /* Remove default border */    border-radius: 5px; /* Rounded corners */    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2); /* Shadow */    cursor: pointer; /* Pointer cursor */    text-align: center; /* Center text */ transition: background-color 0.3s; /* Transition effect */}
+        .encode-button {margin-top:2em; background-color: #DAA520;  color: white; /* Text color */    padding: 0.6em 2em; /* Padding */    font-size: 1em; /* Font size */    border: none; /* Remove default border */    border-radius: 5px; /* Rounded corners */    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2); /* Shadow */    cursor: pointer; /* Pointer cursor */    text-align: center; /* Center text */ transition: background-color 0.3s; /* Transition effect */}
+        .option-button {margin-top:1em; background-color: #20cec5;  color: white; /* Text color */    padding: 0.6em 0; /* Padding */    font-size: 1em; /* Font size */    border: none; /* Remove default border */    border-radius: 5px; /* Rounded corners */    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2); /* Shadow */    cursor: pointer; /* Pointer cursor */    text-align: center; /* Center text */ transition: background-color 0.3s; /* Transition effect */}
         .send-button:hover {background-color: #45a049; /* Darker shade on hover */}
         .encode-button:hover {background-color: #45a049; /* Darker shade on hover */}
         .option-button:hover {background-color: #45a049; /* Darker shade on hover */}
