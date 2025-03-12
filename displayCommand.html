@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Contrôleur Jeu des Ampoulles</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        .container { display: flex; justify-content: center; gap: 2vw; margin-top: 3vw; border-radius: 25px; overflow: hidden; }
+        .code-table { border-collapse: collapse;}
+        .code-table td { width: 2.5em; height: 2.5em; text-align: center; border: 0.5em solid #ccc;}
+        .code-table .on { background-color: gold; }
+        .code-table .off { background-color: gray; }
+        .code-table-editable { border-collapse: collapse;}
+        .code-table-editable td { width: 6em; height: 6em; text-align: center; cursor: pointer; border: 1em solid #ccc; transition: background-color 0.3s;}
+        .code-table-editable td:hover { background: #DAA520 !important; }
+        .code-table-editable .on { background-color: gold; }
+        .code-table-editable .off { background-color: gray; }
+        .side-section {display: flex; flex-direction: column;}
+        .send-button {margin-top:2em; background-color: #CE2029;  color: white; /* Text color */    padding: 10px 20px; /* Padding */    font-size: 16px; /* Font size */    border: none; /* Remove default border */    border-radius: 5px; /* Rounded corners */    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2); /* Shadow */    cursor: pointer; /* Pointer cursor */    text-align: center; /* Center text */ transition: background-color 0.3s; /* Transition effect */}
+        .encode-button {margin-top:2em; background-color: #DAA520;  color: white; /* Text color */    padding: 10px 20px; /* Padding */    font-size: 16px; /* Font size */    border: none; /* Remove default border */    border-radius: 5px; /* Rounded corners */    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2); /* Shadow */    cursor: pointer; /* Pointer cursor */    text-align: center; /* Center text */ transition: background-color 0.3s; /* Transition effect */}
+        .option-button {margin-top:1em; background-color: #20cec5;  color: white; /* Text color */    padding: 10px 20px; /* Padding */    font-size: 16px; /* Font size */    border: none; /* Remove default border */    border-radius: 5px; /* Rounded corners */    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2); /* Shadow */    cursor: pointer; /* Pointer cursor */    text-align: center; /* Center text */ transition: background-color 0.3s; /* Transition effect */}
+        .send-button:hover {background-color: #45a049; /* Darker shade on hover */}
+        .encode-button:hover {background-color: #45a049; /* Darker shade on hover */}
+        .option-button:hover {background-color: #45a049; /* Darker shade on hover */}
+    </style>
+</head>
+<body>
+
+    <h1>Contrôleur Jeu des Ampoules</h1>
+
+    <div class="container">
+        <div class="side-section">
+            <h3>Code Actuel</h3>
+            <div>
+                <table id="currentCode" class="code-table"></table>
+            </div>
+            <div class="side-section"style="margin-top: 0.65em;">
+                <h3>Options</h3>
+                <button style="margin-top: 0;" class="option-button" onclick="randomize()">Randomize</button>
+                <button class="option-button" onclick="drawNumber()">Dessiner un chiffre</button>
+                <button class="option-button" onclick="clearEditCode()">Clear</button>
+                <button class="option-button" onclick="fillEditCode()">Fill</button>
+            </div>
+        </div>
+        <div>
+            <h3>Code en Édition</h3>
+            <table id="editCode" class="code-table-editable"></table>
+            <button class="send-button" onclick="sendToESP32()">Envoyer code</button>
+            <button class="encode-button" onclick="encode()">Encoder</button>
+        </div>
+        <div class="side-section">
+            <div>
+                <h3>Encodé A</h3>
+                <table id="A" class="code-table"></table>
+            </div>
+            <div style="margin-top: 0.65em">
+                <h3>Encodé B</h3>
+                <table id="B" class="code-table"></table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const rows = 5, cols = 3;
+        let encoded = false;
+        let currentCode = new Array(rows * cols).fill(false);
+        let editCode = new Array(rows * cols).fill(false);
+        let encodedCodeA = new Array(rows * cols).fill(false);
+        let encodedCodeB = new Array(rows * cols).fill(false);
+
+        function index(i, j) {
+            return i * cols + j;
+        }
+
+        function generateTable(id, data, editable = false) {
+            const table = document.getElementById(id);
+            table.innerHTML = "";
+            for (let i = 0; i < rows; i++) {
+                const tr = document.createElement("tr");
+                for (let j = 0; j < cols; j++) {
+                    const td = document.createElement("td");
+                    const idx = index(i, j);
+                    td.className = data[idx] ? "on" : "off";
+                    if (editable) {
+                        td.onclick = () => {
+                            encoded = false;
+                            data[idx] = !data[idx];
+                            td.className = data[idx] ? "on" : "off";
+                        };
+                    }
+                    tr.appendChild(td);
+                }
+                table.appendChild(tr);
+            }
+        }
+
+        function randomize() {
+            for (let i = 0; i < rows * cols; i++) {
+                editCode[i] = Math.random() < 0.5;
+            }
+            generateTable("editCode", editCode, true);
+        }
+
+        function clearEditCode() {
+            for (let i = 0; i < rows * cols; i++) {
+                editCode[i] = false;
+            }
+            generateTable("editCode", editCode, true);
+        }
+
+        function fillEditCode() {
+            for (let i = 0; i < rows * cols; i++) {
+                editCode[i] = true;
+            }
+            generateTable("editCode", editCode, true);
+        }
+
+        function drawNumber() {
+            const numbers = [
+                [
+                    true,  true,  true,
+                    true,  false, true,
+                    true,  false, true,
+                    true,  false, true,
+                    true,  true,  true
+                ],[
+                    false, true,  false,
+                    true,  true,  false,
+                    false, true,  false,
+                    false, true,  false,
+                    true,  true,  true,
+                ],[
+                    true,  true,  true,
+                    false, false, true,
+                    true,  true,  true,
+                    true,  false, false,
+                    true,  true,  true
+                ],[
+                    true,  true,  true,
+                    false, false, true,
+                    true,  true,  true,
+                    false, false, true,
+                    true,  true,  true,
+                ],[
+                    true,  false, true,
+                    true,  false, true,
+                    true,  true,  true,
+                    false, false, true,
+                    false, false, true,
+                ],[
+                    true,  true,  true,
+                    true, false, false,
+                    true,  true,  true,
+                    false, false, true,
+                    true,  true,  true,
+                ],[
+                    true,  true,  true,
+                    true, false, false,
+                    true,  true,  true,
+                    true, false,  true,
+                    true,  true,  true
+                ],[
+                    true,  true,  true,
+                    false, false, true,
+                    false, true,  true,
+                    false, false, true,
+                    false, false, true,
+                ],[
+                    true,  true,  true,
+                    true,  false, true,
+                    true,  true,  true,
+                    true,  false, true,
+                    true,  true,  true,
+                ],[
+                    true,  true,  true,
+                    true,  false, true,
+                    true,  true,  true,
+                    false, false, true,
+                    true,  true,  true,
+                ]]
+            let num = prompt("Entrer un chiffre ");
+            if (num < '0' || num > '9' || num < 0 || num > 9)
+            {
+                alert("Veuillez entrer un nombre entre 0 et 9");
+                return;
+            }
+            if (num == null)
+            {
+                return;
+            }
+            editCode = numbers[num];
+            generateTable("editCode", editCode, true);
+        }
+
+        function encode() {
+            /*
+            - on + on = off
+            - off + off = on
+            - on + off = on
+            */
+            encoded = true;
+            for (let i = 0; i < rows*cols; i++)
+            {
+                if (!editCode[i])
+                {
+                    encodedCodeA[i] = true;
+                    encodedCodeB[i] = true;
+                }
+                else if (editCode[i])
+                {
+                    let rand = Math.floor(Math.random() * 3);
+                    if (rand == 0)
+                    {
+                        encodedCodeA[i] = false;
+                        encodedCodeB[i] = false;
+                    }
+                    else if (rand == 1)
+                    {
+                        encodedCodeA[i] = false;
+                        encodedCodeB[i] = true;
+                    }
+                    else if (rand == 2)
+                    {
+                        encodedCodeA[i] = true;
+                        encodedCodeB[i] = false;
+                    }
+                }
+            }
+            generateTable("A", encodedCodeA);
+            generateTable("B", encodedCodeB);
+        }
+
+        function sendToESP32() {
+            if (!encoded) {
+                encode();
+            }
+            const data = {
+                codeA: encodedCodeA,
+                codeB: encodedCodeB,
+                codeRes: editCode
+            };
+        
+            fetch("/updateTables", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.text())
+            .then(response => {
+                console.log("ESP32 Response:", response);
+                alert("Code envoyé !");
+                currentCode = [...editCode]; // Met à jour le code actuel
+                generateTable("currentCode", currentCode);
+            })
+            .catch(error => console.error("Error:", error));
+        }
+
+        generateTable("currentCode", currentCode);
+        generateTable("editCode", editCode, true);
+        generateTable("A", encodedCodeA);
+        generateTable("B", encodedCodeB);
+    </script>
+
+</body>
+</html>
