@@ -78,6 +78,7 @@ void updateButtonStatus();
 bool checkCode();
 void unlockBox();
 void setupPins();
+void scanButtons();
 
 void setup() {
     Serial.begin(115200);
@@ -149,6 +150,8 @@ bool connectToServer(BLEAddress pAdress) {
     lightStatusCharacteristic->registerForNotify(lightStatusNotifyCallBack);
     return true;
 }
+
+
 // Deutsche Qualität
 void updateButtonStatus() {
     for (int i = 0; i < 15; i++) {
@@ -179,7 +182,6 @@ void unlockBox() {
     delay(5000);
     digitalWrite(unlockPin, LOW);
 }
-
 
 void setupPins() {
     pinMode(S0, OUTPUT);
