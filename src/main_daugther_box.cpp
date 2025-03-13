@@ -66,7 +66,7 @@ const int OUT1 = 20;
 const int OUT2 = 21;
 
 // Flag drapeau - Cela permet d'éviter que la fonction "appuye" 2 fois sur le même bouton à cause de sa vitesse d'exécution
-const int flag_button = 1; 
+int flag_button = 1; 
 
 // Tableau des états des boutons
 bool buttonStates[15] = {0};
@@ -81,7 +81,7 @@ void updateButtonStatus();
 bool checkCode();
 void unlockBox();
 void setupPins();
-void scanButtons();
+int scanButtons();
 
 void setup() {
     Serial.begin(115200);

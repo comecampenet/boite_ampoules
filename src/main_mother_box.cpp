@@ -25,7 +25,7 @@ bool deviceConnected = false;
 
 // Timer variables
 unsigned long lastTime = 0;
-unsigned long timerDelay = 30000;
+unsigned long timerDelay = 500;
 
 // Memory state for lights
 bool lightStatus[15] = {false};
