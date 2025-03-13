@@ -65,6 +65,9 @@ const int S2 = 19;
 const int OUT1 = 20;
 const int OUT2 = 21;
 
+// Flag drapeau - Cela permet d'éviter que la fonction "appuye" 2 fois sur le même bouton à cause de sa vitesse d'exécution
+const int flag_button = 1; 
+
 // Tableau des états des boutons
 bool buttonStates[15] = {0};
 
@@ -103,7 +106,10 @@ void loop() {
     }
 
     delay(250);
-    scanButtons();
+    flag_button = scanButtons();
+    if (flag_button == 1){
+        delay(20);
+    }
     delay(50); // 20 fois par seconde
 }
 
@@ -191,7 +197,8 @@ void setupPins() {
     pinMode(OUT2, INPUT);
 }
 
-void scanButtons() {
+int scanButtons() {
+    flag_button = 0;
     for (int i = 0; i < 8; i++) {
         digitalWrite(S0, i & 0x01);
         digitalWrite(S1, (i >> 1) & 0x01);
@@ -200,16 +207,15 @@ void scanButtons() {
         delayMicroseconds(10); // Petit délai pour la stabilité
         
         if (digitalRead(OUT1) == HIGH) {
-            buttonStates[i] = true;
-        } else {
-            buttonStates[i] = false;
+            buttonStates[i] ^= buttonStates[i];
+            flag_button = 1;            // bouton appuyé, attendre que le flag_button repasse à 0 pour appuyer.
         }
         
         if (digitalRead(OUT2) == HIGH) {
-            buttonStates[8 + i] = true;
-        } else {
-            buttonStates[8 + i] = false;
+            buttonStates[8 + i] ^= buttonStates[8 + i];
+            flag_button = 1;           // bouton appuyé, attendre que le flag_button repasse à 0 pour appuyer.
         }
     }
+    return flag_button;
 }
 
