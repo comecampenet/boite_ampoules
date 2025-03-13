@@ -54,6 +54,22 @@ static void lightStatusNotifyCallBack(BLERemoteCharacteristic* pBLERemoteCharact
     }
 }
 
+
+// variables pour le bouton appuyé
+// Pins de sélection (entrée)
+const int S0 = 17;
+const int S1 = 18;
+const int S2 = 19;
+
+// Pins de sortie (lecture)
+const int OUT1 = 20;
+const int OUT2 = 21;
+
+// Tableau des états des boutons
+bool buttonStates[15] = {0};
+
+
+
 // ____ Fonctions ____
 void setupBLE();
 void updateLightStatus();
@@ -61,6 +77,7 @@ bool connectToServer(BLEAddress pAddress);
 void updateButtonStatus();
 bool checkCode();
 void unlockBox();
+void setupPins();
 
 void setup() {
     Serial.begin(115200);
@@ -72,6 +89,7 @@ void setup() {
     }
 
     setupBLE();
+    setupPins();
 }
 
 void loop() {
@@ -157,4 +175,13 @@ void unlockBox() {
     digitalWrite(unlockPin, HIGH);
     delay(5000);
     digitalWrite(unlockPin, LOW);
+}
+
+
+void setupPins() {
+    pinMode(S0, OUTPUT);
+    pinMode(S1, OUTPUT);
+    pinMode(S2, OUTPUT);
+    pinMode(OUT1, INPUT);
+    pinMode(OUT2, INPUT);
 }
