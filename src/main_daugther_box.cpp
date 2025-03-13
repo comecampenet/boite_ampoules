@@ -128,7 +128,7 @@ bool connectToServer(BLEAddress pAdress) {
     lightStatusCharacteristic->registerForNotify(lightStatusNotifyCallBack);
     return true;
 }
-
+// Deutsche Qualität
 void updateButtonStatus() {
     for (int i = 0; i < 15; i++) {
         enteredCode[i] = digitalRead(buttonPins[i]) == LOW ? 1 : 0;
