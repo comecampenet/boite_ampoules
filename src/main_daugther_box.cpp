@@ -89,6 +89,7 @@ void setup() {
     }
 
     setupBLE();
+    Serial.begin(115200);
     setupPins();
 }
 
@@ -101,6 +102,8 @@ void loop() {
     }
 
     delay(250);
+    scanButtons();
+    delay(50); // 20 fois par seconde
 }
 
 void setupBLE() {
@@ -185,3 +188,26 @@ void setupPins() {
     pinMode(OUT1, INPUT);
     pinMode(OUT2, INPUT);
 }
+
+void scanButtons() {
+    for (int i = 0; i < 8; i++) {
+        digitalWrite(S0, i & 0x01);
+        digitalWrite(S1, (i >> 1) & 0x01);
+        digitalWrite(S2, (i >> 2) & 0x01);
+        
+        delayMicroseconds(10); // Petit délai pour la stabilité
+        
+        if (digitalRead(OUT1) == HIGH) {
+            buttonStates[i] = true;
+        } else {
+            buttonStates[i] = false;
+        }
+        
+        if (digitalRead(OUT2) == HIGH) {
+            buttonStates[8 + i] = true;
+        } else {
+            buttonStates[8 + i] = false;
+        }
+    }
+}
+
