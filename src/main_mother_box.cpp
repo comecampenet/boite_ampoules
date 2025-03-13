@@ -159,6 +159,11 @@ void transmitCode() {
     lightStatusCharacteristic->notify();
     lastTime = millis();
   }
+  else 
+  {
+    BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
+    pAdvertising->start(); 
+  }
 }
 
 // ##### Web Page Display #####
