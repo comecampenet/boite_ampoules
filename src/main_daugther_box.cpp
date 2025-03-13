@@ -1,58 +1,52 @@
 #include <Arduino.h>
 #include <BLEDevice.h>
 #include <BLEUtils.h>
-#include <BLEServer.h>
+#include <BLEScan.h>
+#include <BLEAdvertisedDevice.h>
+#include <BLEClient.h>
+#include <BLERemoteService.h>
+#include <BLERemoteCharacteristic.h>
 
 // ### Pins ###
 const int unlockPin = 22;
-const int buttonPins[15] = {2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16};
+const int buttonPins[15] = {13, 14, 15, 16, 17, 18, 19, 21, 23, 25, 26, 27, 32, 33, 34};
 
 // ### Declarations ###
 bool lightStatus[15] = {0};  // Correct code (received via BLE)
 int enteredCode[15] = {0};   // Code entered by the user
 
 // ____BLE____
-const char* serviceUUID = "19B10000-E8F2-537E-4F6C-D104768A1214";
-const char* lightStatusCharacteristicUUID = "19B10001-E8F2-537E-4F6C-D104768A1214";
+#define SERVICE_UUID  "19B10000-E8F2-537E-4F6C-D104768A1214"
+#define CHARACTERISTIC_UUID "19B10001-E8F2-537E-4F6C-D104768A1214"
 
-static boolean doConnect = false;
-static boolean connected = false;
-static BLEAddress* pServerAddress = nullptr;
-static BLERemoteCharacteristic* lightStatusCharacteristic = nullptr;
-bool newStatus = false;
-const char* bleServerName = "Mother Light Box";
 
-// Activation des notifications
-const uint8_t notificationOn[] = {0x1, 0x0};
-const uint8_t notificationOff[] = {0x0, 0x0};
+//bool receivedData[15] = {false}; // Array to store received booleans
+BLEClient* pClient;
+BLERemoteCharacteristic* pRemoteCharacteristic;
+bool connected = false;
+BLEScan* pBLEScan;
+BLEAdvertisedDevice* myDevice = nullptr;
 
-// Callback de scan BLE
-class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
-    void onResult(BLEAdvertisedDevice advertisedDevice) {
-        if (advertisedDevice.getName() == bleServerName) {
-            advertisedDevice.getScan()->stop();
-            pServerAddress = new BLEAddress(advertisedDevice.getAddress());
-            doConnect = true;
-            Serial.println("Device found. Connecting!");
-        }
+class MyClientCallback : public BLEClientCallbacks {
+    void onConnect(BLEClient* pclient) {
+        Serial.println("Connected to server");
+    }
+
+    void onDisconnect(BLEClient* pclient) {
+        Serial.println("Disconnected from server");
+        connected = false;
     }
 };
 
-// Callback de notification BLE (updates lightStatus)
-static void lightStatusNotifyCallBack(BLERemoteCharacteristic* pBLERemoteCharacteristic, uint8_t* pData, size_t length, bool isNotify) {
-    if (length == 15) {
-        memcpy(lightStatus, pData, length);
-        newStatus = true;
-
-        // Debugging: Print updated lightStatus array
-        Serial.print("Updated lightStatus: ");
-        for (int i = 0; i < 15; i++) {
-            Serial.print(lightStatus[i]);
-            Serial.print(" ");
+class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
+    void onResult(BLEAdvertisedDevice advertisedDevice) {
+        if (advertisedDevice.haveServiceUUID() && advertisedDevice.getServiceUUID().equals(BLEUUID(SERVICE_UUID))) {
+            Serial.println("Found matching server!");
+            myDevice = new BLEAdvertisedDevice(advertisedDevice);
+            advertisedDevice.getScan()->stop();
         }
-        Serial.println();
     }
-}
+};
 
 
 // variables pour le bouton appuyé
@@ -75,8 +69,9 @@ bool buttonStates[15] = {0};
 
 // ____ Fonctions ____
 void setupBLE();
-void updateLightStatus();
-bool connectToServer(BLEAddress pAddress);
+void readCharacteristic();
+void scanForServer();
+bool connectToServer();
 void updateButtonStatus();
 bool checkCode();
 void unlockBox();
@@ -98,7 +93,19 @@ void setup() {
 }
 
 void loop() {
-    updateLightStatus();
+    
+    if (!connected) {
+        Serial.println("Scanning for BLE server...");
+        scanForServer();
+        if (myDevice != nullptr) {
+            connected = connectToServer();
+        }
+    }
+
+    if (connected) {
+        readCharacteristic();
+    }
+
     updateButtonStatus();
 
     if (checkCode()) {
@@ -114,47 +121,55 @@ void loop() {
 }
 
 void setupBLE() {
-    BLEDevice::init("");
-    BLEScan* pBLEScan = BLEDevice::getScan();
+    BLEDevice::init("ESP32_BLE_Client");
+    pClient = BLEDevice::createClient();
+    pClient->setClientCallbacks(new MyClientCallback());
+}
+
+void scanForServer() {
+    pBLEScan = BLEDevice::getScan();
     pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
     pBLEScan->setActiveScan(true);
-    pBLEScan->start(30);
+    pBLEScan->start(10, false);
 }
 
-void updateLightStatus() {
-    if (doConnect && pServerAddress != nullptr) {
-        if (connectToServer(*pServerAddress)) {
-            lightStatusCharacteristic->getDescriptor(BLEUUID((uint16_t)0x2902))->writeValue((uint8_t*)notificationOn, 2, true);
-            connected = true;
-        } else {
-            Serial.println("Failed to connect to the server, restart the device.");
-        }
-        doConnect = false;
-    }
-}
-
-bool connectToServer(BLEAddress pAdress) {
-    BLEClient* pClient = BLEDevice::createClient();
-    if (!pClient->connect(pAdress)) {
-        Serial.println("Failed to connect to BLE server.");
+bool connectToServer() {
+    if (myDevice == nullptr) {
+        Serial.println("No BLE server found");
         return false;
     }
-
-    BLERemoteService* pRemoteService = pClient->getService(serviceUUID);
+    Serial.println("Connecting to server...");
+    pClient->connect(myDevice);
+    BLERemoteService* pRemoteService = pClient->getService(SERVICE_UUID);
     if (pRemoteService == nullptr) {
-        Serial.println("Can't find the service.");
+        Serial.println("Failed to find service UUID");
         return false;
     }
 
-    lightStatusCharacteristic = pRemoteService->getCharacteristic(lightStatusCharacteristicUUID);
-    if (lightStatusCharacteristic == nullptr) {
-        Serial.println("Failed to find characteristic UUID.");
+    pRemoteCharacteristic = pRemoteService->getCharacteristic(CHARACTERISTIC_UUID);
+    if (pRemoteCharacteristic == nullptr) {
+        Serial.println("Failed to find characteristic UUID");
         return false;
     }
-
-    Serial.println(" - Found our characteristics");
-    lightStatusCharacteristic->registerForNotify(lightStatusNotifyCallBack);
+    connected = true;
     return true;
+}
+
+void readCharacteristic() {
+    if (connected && pRemoteCharacteristic->canRead()) {
+        std::string value = pRemoteCharacteristic->readValue();
+        if (value.length() >= 15) {
+            for (int i = 0; i < 15; i++) {
+                lightStatus[i] = value[i] != 0; // Convert byte to boolean
+            }
+            Serial.println("Received data:");
+            for (int i = 0; i < 15; i++) {
+                Serial.print(lightStatus[i]);
+                Serial.print(" ");
+            }
+            Serial.println();
+        }
+    }
 }
 
 
