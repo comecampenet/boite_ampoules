@@ -7,9 +7,10 @@
 #include <ArduinoJson.h>
 
 // Memory state for lights
-bool codeRes[15] = {false};
-bool encodedCodeA[15] = {false};
-bool encodedCodeB[15] = {false};
+typedef bool CODE[15];
+CODE codeRes = {false};
+CODE encodedCodeA = {false};
+CODE encodedCodeB = {false};
 
 // ##### Pins #####
 const uint8_t IN_CLOSED = 34;
@@ -125,6 +126,26 @@ box-shadow: 0px 0px 61px 0px rgba(255,217,0,1);
                 table.appendChild(tr);
             }
         }
+
+        async function fetchCodeRes() {
+            try {
+                const response = await fetch("/getCodeRes");
+                if (!response.ok) throw new Error("Failed to fetch codeRes");
+            
+                const data = await response.json();
+                currentCode = data.codeRes;  // Assign received array
+                console.log("Received codeRes:", currentCode);
+                generateTable("currentCode", currentCode);
+                
+
+                //updateUI();  // Call function to update UI if needed
+            } catch (error) {
+                console.error("Error fetching codeRes:", error);
+            }
+        }
+
+        // Call the function on page load
+        fetchCodeRes();
 
         function randomize() {
             for (let i = 0; i < rows * cols; i++) {
@@ -323,6 +344,7 @@ void setupBLE();
 void transmitCode();
 void handleRoot();
 void handlePost();
+void handleGetCodeRes();
 
 // ##### Main Setup #####
 void setup() {
@@ -334,6 +356,9 @@ void setup() {
 
 void loop() {
     server.handleClient();
+    transmitCode();
+
+
     delay(300);
 }
 
@@ -350,6 +375,7 @@ void setupWifi() {
     WiFi.softAP(ssid, password);
     server.on("/", handleRoot);
     server.on("/updateTables", HTTP_POST, handlePost);
+    server.on("/getCodeRes", HTTP_GET, handleGetCodeRes);
     server.begin();
     Serial.println("ESP32 HTTP Server started");
 }
@@ -374,6 +400,22 @@ void setupBLE() {
     BLEDevice::startAdvertising();
 
     Serial.println("BLE setup complete.");
+}
+
+// ##### Handle the lamps
+void displayCode(CODE code)
+{
+    for (int i = 0; i < 15; i++)
+    {
+        if (code[i])
+        {
+            digitalWrite(OUTPUTS[i],LOW);
+        }
+        else if (!code[i])
+        {
+            digitalWrite(OUTPUTS[i],HIGH);
+        }
+    }
 }
 
 // ##### Transmit BLE Data #####
@@ -419,4 +461,18 @@ void handlePost() {
 
     Serial.println("Data received and updated!");
     server.send(200, "text/plain", "OK");
+}
+
+void handleGetCodeRes() {
+    DynamicJsonDocument doc(512);
+
+    JsonArray codeResArray = doc.createNestedArray("codeRes");
+    for (int i = 0; i < 15; i++) {
+        codeResArray.add(codeRes[i]);
+    }
+
+    String response;
+    serializeJson(doc, response);
+    
+    server.send(200, "application/json", response);
 }
