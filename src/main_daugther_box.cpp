@@ -12,7 +12,7 @@ const int unlockPin = 22;
 const int buttonPins[15] = {13, 14, 15, 16, 17, 18, 19, 21, 23, 25, 26, 27, 32, 33, 34};
 
 // ### Declarations ###
-bool lightStatus[15] = {0};  // Correct code (received via BLE)
+bool codeRes[15] = {0};  // Correct code (received via BLE)
 int enteredCode[15] = {0};   // Code entered by the user
 
 // ____BLE____
@@ -160,11 +160,11 @@ void readCharacteristic() {
         std::string value = pRemoteCharacteristic->readValue();
         if (value.length() >= 15) {
             for (int i = 0; i < 15; i++) {
-                lightStatus[i] = value[i] != 0; // Convert byte to boolean
+                codeRes[i] = value[i] != 0; // Convert byte to boolean
             }
             Serial.println("Received data:");
             for (int i = 0; i < 15; i++) {
-                Serial.print(lightStatus[i]);
+                Serial.print(codeRes[i]);
                 Serial.print(" ");
             }
             Serial.println();
@@ -190,7 +190,7 @@ void updateButtonStatus() {
 
 bool checkCode() {
     for (int i = 0; i < 15; i++) {
-        if (enteredCode[i] != lightStatus[i]) {
+        if (enteredCode[i] != codeRes[i]) {
             return false;
         }
     }

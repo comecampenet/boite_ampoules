@@ -1,8 +1,15 @@
 #include <Arduino.h>
-#include <WiFi.h>
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
+#include <WiFi.h>
+#include <WebServer.h>
+#include <ArduinoJson.h>
+
+// Memory state for lights
+bool codeRes[15] = {false};
+bool encodedCodeA[15] = {false};
+bool encodedCodeB[15] = {false};
 
 // ##### Pins #####
 const uint8_t IN_CLOSED = 34;
@@ -12,23 +19,296 @@ const uint8_t OUTPUTS[15] = {4, 13, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 
 const char* ssid = "La_Boite_Ampoules";
 const char* password = "lejeulalejeu";
 
-WiFiServer server(80);
-String header;
+WebServer server(80);
+
+const char webpage[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Contrôleur Jeu des Ampoulles</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; /*background: rgb(251,247,63); background: radial-gradient(circle, rgba(251,247,63,1) 0%, rgba(252,70,185,1) 100%) */}
+        .container { display: flex; justify-content: center; gap: 2em; margin-top: 2em; border-radius: 25px; overflow: hidden; }
+        .code-table { border-collapse: collapse;}
+        .code-table td { width: 2.5em; height: 2.5em; text-align: center; border: 0.5em solid #ccc;}
+        .code-table .on { background-color: gold; 
+-webkit-box-shadow:0px 0px 61px 0px rgba(255,217,0,1);
+-moz-box-shadow: 0px 0px 61px 0px rgba(255,217,0,1);
+box-shadow: 0px 0px 61px 0px rgba(255,217,0,1);}
+        .code-table .off { background-color: gray; }
+        .code-table-editable { border-collapse: collapse;}
+        .code-table-editable td { width: 6em; height: 6em; text-align: center; cursor: pointer; border: 1em solid #ccc; transition: background-color 0.3s;}
+        .code-table-editable td:hover { background: #DAA520 !important; }
+        .code-table-editable .on { background-color: gold; 
+-webkit-box-shadow:0px 0px 61px 0px rgba(255,217,0,1);
+-moz-box-shadow: 0px 0px 61px 0px rgba(255,217,0,1);
+box-shadow: 0px 0px 61px 0px rgba(255,217,0,1);
+}
+        .code-table-editable .off { background-color: gray; }
+        .side-section {display: flex; flex-direction: column;}
+        .send-button {margin-top:2em; background-color: #CE2029;  color: white; /* Text color */    padding: 0.6em 2em; /* Padding */    font-size: 1em; /* Font size */    border: none; /* Remove default border */    border-radius: 5px; /* Rounded corners */    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2); /* Shadow */    cursor: pointer; /* Pointer cursor */    text-align: center; /* Center text */ transition: background-color 0.3s; /* Transition effect */}
+        .encode-button {margin-top:2em; background-color: #DAA520;  color: white; /* Text color */    padding: 0.6em 2em; /* Padding */    font-size: 1em; /* Font size */    border: none; /* Remove default border */    border-radius: 5px; /* Rounded corners */    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2); /* Shadow */    cursor: pointer; /* Pointer cursor */    text-align: center; /* Center text */ transition: background-color 0.3s; /* Transition effect */}
+        .option-button {margin-top:1em; background-color: #20cec5;  color: white; /* Text color */    padding: 0.6em 0; /* Padding */    font-size: 1em; /* Font size */    border: none; /* Remove default border */    border-radius: 5px; /* Rounded corners */    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.2); /* Shadow */    cursor: pointer; /* Pointer cursor */    text-align: center; /* Center text */ transition: background-color 0.3s; /* Transition effect */}
+        .send-button:hover {background-color: #45a049; /* Darker shade on hover */}
+        .encode-button:hover {background-color: #45a049; /* Darker shade on hover */}
+        .option-button:hover {background-color: #45a049; /* Darker shade on hover */}
+    </style>
+</head>
+<body>
+
+    <h1>Contrôleur Jeu des Ampoules</h1>
+
+    <div class="container">
+        <div class="side-section">
+            <h3>Code Actuel</h3>
+            <div>
+                <table id="currentCode" class="code-table"></table>
+            </div>
+            <div class="side-section"style="margin-top: 0.65em;">
+                <h3>Options</h3>
+                <button style="margin-top: 0;" class="option-button" onclick="randomize()">Randomize</button>
+                <button class="option-button" onclick="drawNumber()">Dessiner un chiffre</button>
+                <button class="option-button" onclick="clearEditCode()">Clear</button>
+                <button class="option-button" onclick="fillEditCode()">Fill</button>
+            </div>
+        </div>
+        <div>
+            <h3>Code en Édition</h3>
+            <table id="editCode" class="code-table-editable"></table>
+            <button class="send-button" onclick="sendToESP32()">Envoyer code</button>
+            <button class="encode-button" onclick="encode()">Encoder</button>
+        </div>
+        <div class="side-section">
+            <div>
+                <h3>Encodé A</h3>
+                <table id="A" class="code-table"></table>
+            </div>
+            <div style="margin-top: 0.65em">
+                <h3>Encodé B</h3>
+                <table id="B" class="code-table"></table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const rows = 5, cols = 3;
+        let encoded = false;
+        let currentCode = new Array(rows * cols).fill(false);
+        let editCode = new Array(rows * cols).fill(false);
+        let encodedCodeA = new Array(rows * cols).fill(false);
+        let encodedCodeB = new Array(rows * cols).fill(false);
+
+        function index(i, j) {
+            return i * cols + j;
+        }
+
+        function generateTable(id, data, editable = false) {
+            const table = document.getElementById(id);
+            table.innerHTML = "";
+            for (let i = 0; i < rows; i++) {
+                const tr = document.createElement("tr");
+                for (let j = 0; j < cols; j++) {
+                    const td = document.createElement("td");
+                    const idx = index(i, j);
+                    td.className = data[idx] ? "on" : "off";
+                    if (editable) {
+                        td.onclick = () => {
+                            encoded = false;
+                            data[idx] = !data[idx];
+                            td.className = data[idx] ? "on" : "off";
+                        };
+                    }
+                    tr.appendChild(td);
+                }
+                table.appendChild(tr);
+            }
+        }
+
+        function randomize() {
+            for (let i = 0; i < rows * cols; i++) {
+                editCode[i] = Math.random() < 0.5;
+            }
+            generateTable("editCode", editCode, true);
+        }
+
+        function clearEditCode() {
+            for (let i = 0; i < rows * cols; i++) {
+                editCode[i] = false;
+            }
+            generateTable("editCode", editCode, true);
+        }
+
+        function fillEditCode() {
+            for (let i = 0; i < rows * cols; i++) {
+                editCode[i] = true;
+            }
+            generateTable("editCode", editCode, true);
+        }
+
+        function drawNumber() {
+            const numbers = [
+                [
+                    true,  true,  true,
+                    true,  false, true,
+                    true,  false, true,
+                    true,  false, true,
+                    true,  true,  true
+                ],[
+                    false, true,  false,
+                    true,  true,  false,
+                    false, true,  false,
+                    false, true,  false,
+                    true,  true,  true,
+                ],[
+                    true,  true,  true,
+                    false, false, true,
+                    true,  true,  true,
+                    true,  false, false,
+                    true,  true,  true
+                ],[
+                    true,  true,  true,
+                    false, false, true,
+                    true,  true,  true,
+                    false, false, true,
+                    true,  true,  true,
+                ],[
+                    true,  false, true,
+                    true,  false, true,
+                    true,  true,  true,
+                    false, false, true,
+                    false, false, true,
+                ],[
+                    true,  true,  true,
+                    true, false, false,
+                    true,  true,  true,
+                    false, false, true,
+                    true,  true,  true,
+                ],[
+                    true,  true,  true,
+                    true, false, false,
+                    true,  true,  true,
+                    true, false,  true,
+                    true,  true,  true
+                ],[
+                    true,  true,  true,
+                    false, false, true,
+                    false, true,  true,
+                    false, false, true,
+                    false, false, true,
+                ],[
+                    true,  true,  true,
+                    true,  false, true,
+                    true,  true,  true,
+                    true,  false, true,
+                    true,  true,  true,
+                ],[
+                    true,  true,  true,
+                    true,  false, true,
+                    true,  true,  true,
+                    false, false, true,
+                    true,  true,  true,
+                ]]
+            let num = prompt("Entrer un chiffre ");
+            if (num < '0' || num > '9' || num < 0 || num > 9)
+            {
+                alert("Veuillez entrer un nombre entre 0 et 9");
+                return;
+            }
+            if (num == null)
+            {
+                return;
+            }
+            editCode = numbers[num];
+            generateTable("editCode", editCode, true);
+        }
+
+        function encode() {
+            /*
+            - on + on = off
+            - off + off = on
+            - on + off = on
+            */
+            encoded = true;
+            for (let i = 0; i < rows*cols; i++)
+            {
+                if (!editCode[i])
+                {
+                    encodedCodeA[i] = true;
+                    encodedCodeB[i] = true;
+                }
+                else if (editCode[i])
+                {
+                    let rand = Math.floor(Math.random() * 3);
+                    if (rand == 0)
+                    {
+                        encodedCodeA[i] = false;
+                        encodedCodeB[i] = false;
+                    }
+                    else if (rand == 1)
+                    {
+                        encodedCodeA[i] = false;
+                        encodedCodeB[i] = true;
+                    }
+                    else if (rand == 2)
+                    {
+                        encodedCodeA[i] = true;
+                        encodedCodeB[i] = false;
+                    }
+                }
+            }
+            generateTable("A", encodedCodeA);
+            generateTable("B", encodedCodeB);
+        }
+
+        function sendToESP32() {
+            if (!encoded) {
+                encode();
+            }
+            const data = {
+                codeA: encodedCodeA,
+                codeB: encodedCodeB,
+                codeRes: editCode
+            };
+        
+            fetch("/updateTables", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.text())
+            .then(response => {
+                console.log("ESP32 Response:", response);
+                alert("Code envoyé !");
+                currentCode = [...editCode]; // Met à jour le code actuel
+                generateTable("currentCode", currentCode);
+            })
+            .catch(error => console.error("Error:", error));
+        }
+
+        generateTable("currentCode", currentCode);
+        generateTable("editCode", editCode, true);
+        generateTable("A", encodedCodeA);
+        generateTable("B", encodedCodeB);
+    </script>
+
+</body>
+</html>
+    )rawliteral";
 
 // ##### BLE Declarations #####
 const char* serviceUUID = "19B10000-E8F2-537E-4F6C-D104768A1214";
 const char* characteristicUUID = "19B10001-E8F2-537E-4F6C-D104768A1214";
 const char* bleServerName = "Mother Light Box";
 
-BLECharacteristic *lightStatusCharacteristic;
+BLECharacteristic *codeResCharacteristic;
 bool deviceConnected = false;
 
 // Timer variables
 unsigned long lastTime = 0;
 unsigned long timerDelay = 500;
 
-// Memory state for lights
-bool lightStatus[15] = {false};
 
 // ##### BLE Callbacks #####
 class MyServerCallbacks : public BLEServerCallbacks {
@@ -41,7 +321,8 @@ void setupPins();
 void setupWifi();
 void setupBLE();
 void transmitCode();
-void displayWebPage(WiFiClient _client);
+void handleRoot();
+void handlePost();
 
 // ##### Main Setup #####
 void setup() {
@@ -52,139 +333,90 @@ void setup() {
 }
 
 void loop() {
-  WiFiClient client = server.available();
-  if (client) {
-    Serial.println("New Client");
-    String currentLine = "";
-    while (client.connected()) {
-      if (client.available()) {
-        char c = client.read();
-        Serial.write(c);
-        header += c;
-
-        if (c == '\n') {
-          if (currentLine.length() == 0) {
-            client.println("HTTP/1.1 200 OK");
-            client.println("Content-type:text/html");
-            client.println("Connection: close");
-            client.println();
-
-            for (int i = 0; i < 15; i++) {
-              if (header.indexOf("GET /" + String(i) + "/on") >= 0) {
-                Serial.println("Lamp " + String(i) + " ON");
-                lightStatus[i] = true;
-                transmitCode();
-              } 
-              else if (header.indexOf("GET /" + String(i) + "/off") >= 0) {
-                Serial.println("Lamp " + String(i) + " OFF");
-                lightStatus[i] = false;
-                transmitCode();
-              }
-            }
-
-            displayWebPage(client);
-            client.println();
-            break;
-          } else {
-            currentLine = "";
-          }
-        } else if (c != '\r') {
-          currentLine += c;
-        }
-      }
-    }
-
-    header = "";
-    client.stop();
-    Serial.println("Client disconnected");
-  }
-
-  if (digitalRead(IN_CLOSED) == HIGH) {
-    for (int i = 0; i < 15; i++) {
-      digitalWrite(OUTPUTS[i], lightStatus[i] ? LOW : HIGH);
-      Serial.println("L" + String(i) + (lightStatus[i] ? " is ON" : " is OFF"));
-    }
-  } else {
-    for (int i = 0; i < 15; i++) {
-      digitalWrite(OUTPUTS[i], HIGH);
-    }
-  }
-
-  delay(200);
+    server.handleClient();
+    delay(300);
 }
 
 // ##### Setup Functions #####
 void setupPins() {
-  pinMode(IN_CLOSED, INPUT);
-  for (int i = 0; i < 15; i++) {
-    pinMode(OUTPUTS[i], OUTPUT);
-    digitalWrite(OUTPUTS[i], HIGH);
-  }
+    pinMode(IN_CLOSED, INPUT);
+    for (int i = 0; i < 15; i++) {
+        pinMode(OUTPUTS[i], OUTPUT);
+        digitalWrite(OUTPUTS[i], HIGH);
+    }
 }
 
 void setupWifi() {
-  Serial.println("Setting up WiFi AP...");
-  WiFi.softAP(ssid, password);
-  Serial.print("AP IP address: ");
-  Serial.println(WiFi.softAPIP());
-  server.begin();
+    WiFi.softAP(ssid, password);
+    server.on("/", handleRoot);
+    server.on("/updateTables", HTTP_POST, handlePost);
+    server.begin();
+    Serial.println("ESP32 HTTP Server started");
 }
 
 void setupBLE() {
-  BLEDevice::init(bleServerName);
-  BLEServer *pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new MyServerCallbacks());
+    BLEDevice::init(bleServerName);
+    BLEServer *pServer = BLEDevice::createServer();
+    pServer->setCallbacks(new MyServerCallbacks());
 
-  BLEService *pService = pServer->createService(serviceUUID);
-  lightStatusCharacteristic = pService->createCharacteristic(
-    characteristicUUID, 
-    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY
-  );
+    BLEService *pService = pServer->createService(serviceUUID);
+    codeResCharacteristic = pService->createCharacteristic(
+        characteristicUUID, 
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_NOTIFY
+    );
 
-  lightStatusCharacteristic->setValue((uint8_t*)lightStatus, sizeof(lightStatus));
-  pService->start();
+    codeResCharacteristic->setValue((uint8_t*)codeRes, sizeof(codeRes));
+    pService->start();
 
-  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->addServiceUUID(serviceUUID);
-  pAdvertising->setScanResponse(true);
-  BLEDevice::startAdvertising();
+    BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+    pAdvertising->addServiceUUID(serviceUUID);
+    pAdvertising->setScanResponse(true);
+    BLEDevice::startAdvertising();
 
-  Serial.println("BLE setup complete.");
+    Serial.println("BLE setup complete.");
 }
 
 // ##### Transmit BLE Data #####
 void transmitCode() {
-  if (deviceConnected && (millis() - lastTime > timerDelay)) {
-    lightStatusCharacteristic->setValue((uint8_t*)lightStatus, sizeof(lightStatus));
-    lightStatusCharacteristic->notify();
-    lastTime = millis();
-  }
-  else 
-  {
-    BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
-    pAdvertising->start(); 
-  }
+    if (deviceConnected && (millis() - lastTime > timerDelay)) {
+        codeResCharacteristic->setValue((uint8_t*)codeRes, sizeof(codeRes));
+        codeResCharacteristic->notify();
+        lastTime = millis();
+    }
+    else 
+    {
+        BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
+        pAdvertising->start(); 
+    }
 }
 
-// ##### Web Page Display #####
-void displayWebPage(WiFiClient _client) {
-  _client.println("<!DOCTYPE html><html lang=\"fr\">");
-  _client.println("<head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">");
-  _client.println("<title>Le jeu des ampoules</title>");
-  _client.println("<style>body { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: Arial, sans-serif; }");
-  _client.println("h1 { font-size: 2em; color: #333; margin: 10px 0;}");
-  _client.println(".grid { display: grid; grid-template-columns: repeat(3, 100px); grid-template-rows: repeat(5, 100px); gap: 10px; }");
-  _client.println("button { width: 100px; height: 100px; color: white; border: none; border-radius: 40px; cursor: pointer; font-size: 16px; transition: 0.5s; }");
-  _client.println("button:hover { background: #DAA520 !important; }</style></head>");
-  _client.println("<body><h1>Le jeu des ampoules</h1>");
-  _client.println("<p>Cliquez sur les boutons pour allumer les lampes</p>");
-  _client.println("<div class=\"grid\">");
+// ### handle wifi server
 
-  for (int i = 0; i < 15; i++) {
-    String color = lightStatus[i] ? "#FFD700" : "#555555";
-    _client.println("<a href=\"/" + String(i) + (lightStatus[i] ? "/off" : "/on") + "\">");
-    _client.println("<button style=\"background: " + color + ";\">L" + String(i) + "</button></a>");
-  }
 
-  _client.println("</div></body></html>");
+void handleRoot() {
+    server.send(200, "text/html", webpage);
+}
+
+void handlePost() {
+    DynamicJsonDocument doc(1024);
+    DeserializationError error = deserializeJson(doc, server.arg("plain"));
+
+    if (error) {
+        Serial.println("Failed to parse JSON");
+        server.send(400, "text/plain", "Invalid JSON");
+        return;
+    }
+
+    JsonArray codeResArray = doc["codeRes"].as<JsonArray>();
+    JsonArray encodedAArray = doc["codeA"].as<JsonArray>();
+    JsonArray encodedBArray = doc["codeB"].as<JsonArray>();
+
+    for (int i = 0; i < 15; i++) {
+        codeRes[i] = codeResArray[i];
+        encodedCodeA[i] = encodedAArray[i];
+        encodedCodeB[i] = encodedBArray[i];
+    }
+
+    Serial.println("Data received and updated!");
+    server.send(200, "text/plain", "OK");
 }
