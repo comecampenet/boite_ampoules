@@ -146,6 +146,10 @@ box-shadow: 0px 0px 61px 0px rgba(255,217,0,1);
 
         // Call the function on page load
         fetchCodeRes();
+        setInterval(refreshCurrentCodeHandler, 1000);  // Refresh every second
+        function refreshCurrentCodeHandler(){
+            fetchCodeRes();
+        }
 
         function randomize() {
             for (let i = 0; i < rows * cols; i++) {
