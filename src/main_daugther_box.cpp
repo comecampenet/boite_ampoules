@@ -65,6 +65,11 @@ int flag_button = 1;
 // Tableau des états des boutons
 bool buttonStates[15] = {0};
 
+// Pins pour le shift register
+const int DATA_PIN = 5;  // Pin de données
+const int CLOCK_PIN = 6; // Pin d'horloge
+const int LATCH_PIN = 7; // Pin de verrouillage
+
 
 
 // ____ Fonctions ____
@@ -90,6 +95,16 @@ void setup() {
     setupBLE();
     Serial.begin(115200);
     setupPins();
+
+    // setup shift-register
+    pinMode(DATA_PIN, OUTPUT);
+    pinMode(CLOCK_PIN, OUTPUT);
+    pinMode(LATCH_PIN, OUTPUT);
+    
+    // Initialiser le shift register
+    digitalWrite(LATCH_PIN, LOW);
+    digitalWrite(CLOCK_PIN, LOW);
+    digitalWrite(DATA_PIN, LOW);
 }
 
 void loop() {
@@ -118,6 +133,10 @@ void loop() {
         delay(20);
     }
     delay(50); // 20 fois par seconde
+
+    // partie shift-register
+    updateShiftRegister();
+    delay(100); // Mise à jour périodique
 }
 
 void setupBLE() {
@@ -234,3 +253,28 @@ int scanButtons() {
     return flag_button;
 }
 
+
+// Partie pour le shift-register
+// Fonction pour décaler un bit dans le shift register
+void shiftBit(bool bitValue) {
+    digitalWrite(DATA_PIN, bitValue);  // Mettre la valeur sur DATA
+    digitalWrite(CLOCK_PIN, HIGH);     // Cycle d'horloge
+    delayMicroseconds(5);        // delay pour qu'on n'écrive pas les 2 d'un coup
+    digitalWrite(CLOCK_PIN, LOW);
+}
+
+// Fonction pour verrouiller les données dans le registre
+void latchData() {
+    digitalWrite(LATCH_PIN, HIGH);
+    delayMicroseconds(5);        // delay pour qu'on n'écrive pas les 2 d'un coup
+    digitalWrite(LATCH_PIN, LOW);
+}
+
+// Fonction pour envoyer les états des boutons au shift register
+void updateShiftRegister() {
+    digitalWrite(LATCH_PIN, LOW); // Préparation
+    for (int i = 0; i < 15; i++) {
+        shiftBit(buttonStates[i]); // Envoi des bits des boutons
+    }
+    latchData(); // Verrouillage des valeurs
+}
