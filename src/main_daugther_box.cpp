@@ -82,6 +82,9 @@ bool checkCode();
 void unlockBox();
 void setupPins();
 int scanButtons();
+void shiftBit(bool bitValue);
+void latchData();
+void updateShiftRegister();
 
 void setup() {
     Serial.begin(115200);
