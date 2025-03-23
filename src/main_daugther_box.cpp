@@ -13,16 +13,17 @@ const int buttonPins[15] = {13, 14, 15, 16, 17, 18, 19, 21, 23, 25, 26, 27, 32, 
 
 // ### Declarations ###
 bool codeRes[15] = {0};  // Correct code (received via BLE)
-int enteredCode[15] = {0};   // Code entered by the user
+bool enteredCode[15] = {0};   // Code entered by the user
 
 // ____BLE____
 #define SERVICE_UUID  "19B10000-E8F2-537E-4F6C-D104768A1214"
-#define CHARACTERISTIC_UUID "19B10001-E8F2-537E-4F6C-D104768A1214"
-
+#define CODE_RES_CHARACTERISTIC_UUID "19B10001-E8F2-537E-4F6C-D104768A1214"
+#define BUTTON_STATUS_CHARACTERISTIC_UUID "19B10002-E8F2-537E-4F6C-D104768A1214"
 
 //bool receivedData[15] = {false}; // Array to store received booleans
 BLEClient* pClient;
-BLERemoteCharacteristic* pRemoteCharacteristic;
+BLERemoteCharacteristic* pRemoteCodeResCharacteristic;
+BLERemoteCharacteristic* pRemoteButtonStatusCharacteristic;
 bool connected = false;
 BLEScan* pBLEScan;
 BLEAdvertisedDevice* myDevice = nullptr;
@@ -74,7 +75,8 @@ const int LATCH_PIN = 7; // Pin de verrouillage
 
 // ____ Fonctions ____
 void setupBLE();
-void readCharacteristic();
+void readCodeResCharacteristic();
+void writeButtonStatusCharacteristic();
 void scanForServer();
 bool connectToServer();
 void updateButtonStatus();
@@ -121,7 +123,7 @@ void loop() {
     }
 
     if (connected) {
-        readCharacteristic();
+        readCodeResCharacteristic();
     }
 
     updateButtonStatus();
@@ -168,8 +170,9 @@ bool connectToServer() {
         return false;
     }
 
-    pRemoteCharacteristic = pRemoteService->getCharacteristic(CHARACTERISTIC_UUID);
-    if (pRemoteCharacteristic == nullptr) {
+    pRemoteCodeResCharacteristic = pRemoteService->getCharacteristic(CODE_RES_CHARACTERISTIC_UUID);
+    pRemoteButtonStatusCharacteristic = pRemoteService->getCharacteristic(BUTTON_STATUS_CHARACTERISTIC_UUID);
+    if (pRemoteCodeResCharacteristic == nullptr || pRemoteButtonStatusCharacteristic == nullptr) {
         Serial.println("Failed to find characteristic UUID");
         return false;
     }
@@ -177,9 +180,9 @@ bool connectToServer() {
     return true;
 }
 
-void readCharacteristic() {
-    if (connected && pRemoteCharacteristic->canRead()) {
-        std::string value = pRemoteCharacteristic->readValue();
+void readCodeResCharacteristic() {
+    if (connected && pRemoteCodeResCharacteristic->canRead()) {
+        std::string value = pRemoteCodeResCharacteristic->readValue();
         if (value.length() >= 15) {
             for (int i = 0; i < 15; i++) {
                 codeRes[i] = value[i] != 0; // Convert byte to boolean
@@ -194,6 +197,11 @@ void readCharacteristic() {
     }
 }
 
+void writeButtonStatusCharacteristic() {
+    if (connected && pRemoteButtonStatusCharacteristic->canWrite()) {
+        pRemoteButtonStatusCharacteristic->writeValue((uint8_t*) enteredCode, 15);
+    }
+}
 
 // Deutsche Qualität
 void updateButtonStatus() {
