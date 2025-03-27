@@ -559,6 +559,14 @@ unsigned long lastTime = 0;
 unsigned long timerDelay = 500;
 
 
+// Game State
+enum GameState { CODE_A, WAIT, CODE_B, CODE_RES };
+GameState currentState = CODE_A;
+unsigned long stateStartTime = 0;
+const unsigned long displayDuration = 5000;
+const unsigned long waitDuration = 2000;
+
+
 // ##### BLE Callbacks #####
 class MyServerCallbacks : public BLEServerCallbacks {
 	void onConnect(BLEServer* pServer) { deviceConnected = true; }
@@ -578,6 +586,7 @@ void handleGetCodeRes();
 void handleGetEncodedCodes();
 void handlePostGameMode();
 void handleGetButtonStatus();
+void updateGameState();
 
 
 // ##### Main Setup #####
@@ -586,13 +595,14 @@ void setup() {
 	setupPins();
 	setupWifi();
 	setupBLE();
+    stateStartTime = millis();
 }
 
 void loop() {
     server.handleClient();
+    updateGameState();
     transmitCode();
-
-
+    
     delay(300);
 }
 
@@ -788,4 +798,36 @@ void handlePostGameMode(){
 
     Serial.println("Data received and updated!");
     server.send(200, "text/plain", "OK");
+}
+
+
+// ##### Update Game State #####
+void updateGameState() {
+	unsigned long currentTime = millis();
+	switch (currentState) {
+		case CODE_A:
+			displayCode(encodedCodeA);
+			if (currentTime - stateStartTime > displayDuration) {
+				currentState = WAIT;
+				stateStartTime = currentTime;
+			}
+			break;
+		case WAIT:
+			if (currentTime - stateStartTime > waitDuration) {
+				currentState = CODE_B;
+				stateStartTime = currentTime;
+			}
+			break;
+		case CODE_B:
+			displayCode(encodedCodeB);
+			if (currentTime - stateStartTime > displayDuration) {
+				currentState = CODE_RES;
+				stateStartTime = currentTime;
+			}
+			break;
+		case CODE_RES:
+			displayCode(codeRes);
+			// Une fois dans cet état, on reste ici et on envoie le signal d'ouverture
+			break;
+	}
 }
