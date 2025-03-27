@@ -789,3 +789,36 @@ void handlePostGameMode(){
     Serial.println("Data received and updated!");
     server.send(200, "text/plain", "OK");
 }
+
+
+// ##### Update Game State #####
+void updateGameState() {
+	unsigned long currentTime = millis();
+	switch (currentState) {
+		case CODE_A:
+			displayCode(encodedCodeA);
+			if (currentTime - stateStartTime > displayDuration) {
+				currentState = WAIT;
+				stateStartTime = currentTime;
+			}
+			break;
+		case WAIT:
+			if (currentTime - stateStartTime > waitDuration) {
+				currentState = CODE_B;
+				stateStartTime = currentTime;
+			}
+			break;
+		case CODE_B:
+			displayCode(encodedCodeB);
+			if (currentTime - stateStartTime > displayDuration) {
+				currentState = CODE_RES;
+				stateStartTime = currentTime;
+			}
+			break;
+		case CODE_RES:
+			displayCode(codeRes);
+			// Une fois dans cet état, on reste ici et on envoie le signal d'ouverture
+			break;
+	}
+}
+
