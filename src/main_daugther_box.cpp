@@ -12,7 +12,6 @@ const int unlockPin = 22;
 
 // ### Declarations ###
 bool codeRes[15] = {0};  // Correct code (received via BLE)
-bool enteredCode[15] = {0};   // Code entered by the user
 
 // ____BLE____
 #define SERVICE_UUID  "19B10000-E8F2-537E-4F6C-D104768A1214"
@@ -59,9 +58,6 @@ const int S2 = 16;
 const int OUT1 = 18; // MUX 1 Output (Buttons 0-7)
 const int OUT2 = 19; // MUX 2 Output (Buttons 8-15)
 const int ENABLE = 4;
-
-// Tableau des états des boutons
-bool buttonStates[15] = {0};
 
 // Shift Register Pins (74HC595)
 const int SER = 32;      // Serial Data Input (DS)
