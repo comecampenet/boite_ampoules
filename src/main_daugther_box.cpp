@@ -126,8 +126,9 @@ void loop() {
 
         if (connected) {
             readCodeResCharacteristic();
+            writeButtonStatusCharacteristic();
         }
-        writeButtonStatusCharacteristic();
+
         if (checkCode()) {
             unlockBox();
         }
