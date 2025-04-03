@@ -110,7 +110,7 @@ void setup() {
 }
 
 
-// à changer
+
 void loop() {
     
     if (!connected) {
