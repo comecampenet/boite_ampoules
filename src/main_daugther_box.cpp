@@ -75,7 +75,9 @@ const int NUM_BUTTONS = 16;
 bool previousButtonState[NUM_BUTTONS] = {false}; // Store previous state (false = LOW/released)
 unsigned long lastDebounceTime[NUM_BUTTONS] = {0}; // Store time of last transition
 const unsigned long DEBOUNCE_DELAY = 50; // milliseconds
-
+bool isBoxUnlocked = false;
+long timeBoxUnlocked = 0;
+const unsigned long UNLOCK_DELAY = 5000;
 
 
 // ____ Fonctions ____
@@ -102,11 +104,11 @@ void setup() {
     pinMode(unlockPin, OUTPUT);
     digitalWrite(unlockPin, LOW);
 
-    setupBLE();
-    
-    Serial.println("ESP32 Shift Register & MUX Control Initialized");
     setupMultiplexers();
     setupShiftRegister();
+    Serial.println("ESP32 Shift Register & MUX Control Initialized");
+    setupBLE();
+    
 }
 
 long lastBLECheck = 0;
@@ -131,6 +133,11 @@ void loop() {
 
         if (checkCode()) {
             unlockBox();
+        }   // Lock the box if the code is not correct and after UNLOCK_DELAY ms has passed 
+        else if ((isBoxUnlocked == true) && (millis() - timeBoxUnlocked > UNLOCK_DELAY)) {
+            Serial.println("\nFermeture de la boîte !\n");
+            digitalWrite(unlockPin, LOW);
+            isBoxUnlocked = false;
         }
 
     }
@@ -139,7 +146,7 @@ void loop() {
     // Read buttons and update LED state
     getButtons();
     // Small delay to prevent busy-looping and allow serial buffer to empty
-    delay(10);
+    delay(50);
 }
 
 void setupBLE() {
@@ -212,10 +219,12 @@ bool checkCode() {
 }
 
 void unlockBox() {
-    Serial.println("Code correct, ouverture de la boîte !");
-    digitalWrite(unlockPin, HIGH);
-    delay(5000);
-    digitalWrite(unlockPin, LOW);
+    if (isBoxUnlocked == false) {
+        Serial.println("\nCode correct, ouverture de la boîte !\n");
+        digitalWrite(unlockPin, HIGH);
+        isBoxUnlocked = true;
+        timeBoxUnlocked = millis();
+    }
 }
 
 
@@ -357,6 +366,8 @@ void setupShiftRegister() {
       digitalWrite(SRCLRbar, HIGH); // Keep HIGH for normal operation
       digitalWrite(OEbar, LOW);     // Enable outputs
     
+      shitfAndStoreTab();
+
       Serial.println("Shift registers cleared and enabled.");
     
       // Optional: Run LED test once at startup
