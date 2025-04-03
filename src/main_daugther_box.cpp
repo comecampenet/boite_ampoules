@@ -109,27 +109,30 @@ void setup() {
     setupShiftRegister();
 }
 
-
-
+long lastBLECheck = 0;
+long waittime = 250;
+// à changer
 void loop() {
-    
-    if (!connected) {
-        Serial.println("Scanning for BLE server...");
-        scanForServer();
-        if (myDevice != nullptr) {
-            connected = connectToServer();
+    if ((millis() - lastBLECheck) > waittime) {  
+        lastBLECheck = millis();
+
+        if (!connected) {
+            Serial.println("Scanning for BLE server...");
+            scanForServer();
+            if (myDevice != nullptr) {
+                connected = connectToServer();
+            }
         }
-    }
 
-    if (connected) {
-        readCodeResCharacteristic();
-    }
+        if (connected) {
+            readCodeResCharacteristic();
+        }
+        writeButtonStatusCharacteristic();
+        if (checkCode()) {
+            unlockBox();
+        }
 
-    if (checkCode()) {
-        unlockBox();
     }
-
-    delay(250);
 
     // partie shift-register
     // Read buttons and update LED state
