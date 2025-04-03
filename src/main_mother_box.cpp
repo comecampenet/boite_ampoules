@@ -602,8 +602,10 @@ void loop() {
     server.handleClient();
     updateGameState();
     transmitCode();
+    readButtonStatusCharacteristic();
     
-    delay(300);
+
+    delay(300);     // Pause pour éviter la surcharge du processeur
 }
 
 // ##### Setup Functions #####
@@ -800,6 +802,11 @@ void handlePostGameMode(){
     server.send(200, "text/plain", "OK");
 }
 
+/* 
+condition de choix : gameMode
+delay + afficher les bons codes selon gameMode
+et vérifier boite fermé ou ouverte
+*/
 
 // ##### Update Game State #####
 void updateGameState() {

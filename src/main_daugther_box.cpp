@@ -9,7 +9,6 @@
 
 // ### Pins ###
 const int unlockPin = 22;
-const int buttonPins[15] = {13, 14, 15, 16, 17, 18, 19, 21, 23, 25, 26, 27, 32, 33, 34};
 
 // ### Declarations ###
 bool codeRes[15] = {0};  // Correct code (received via BLE)
@@ -51,25 +50,35 @@ class MyAdvertisedDeviceCallbacks : public BLEAdvertisedDeviceCallbacks {
 
 
 // variables pour le bouton appuyé
-// Pins de sélection (entrée)
-const int S0 = 17;
-const int S1 = 18;
-const int S2 = 19;
+// Multiplexer Pins
+const int S0 = 5;
+const int S1 = 17;
+const int S2 = 16;
 
 // Pins de sortie (lecture)
-const int OUT1 = 20;
-const int OUT2 = 21;
-
-// Flag drapeau - Cela permet d'éviter que la fonction "appuye" 2 fois sur le même bouton à cause de sa vitesse d'exécution
-int flag_button = 1; 
+const int OUT1 = 18; // MUX 1 Output (Buttons 0-7)
+const int OUT2 = 19; // MUX 2 Output (Buttons 8-15)
+const int ENABLE = 4;
 
 // Tableau des états des boutons
 bool buttonStates[15] = {0};
 
-// Pins pour le shift register
-const int DATA_PIN = 5;  // Pin de données
-const int CLOCK_PIN = 6; // Pin d'horloge
-const int LATCH_PIN = 7; // Pin de verrouillage
+// Shift Register Pins (74HC595)
+const int SER = 32;      // Serial Data Input (DS)
+const int SRCLK = 26;    // Shift Register Clock (SHCP)
+const int SRCLRbar = 27; // Shift Register Clear (MR - Active LOW)
+const int RCLK = 25;     // Register Clock / Latch (STCP)
+const int OEbar = 33;    // Output Enable (OE - Active LOW)
+
+// Global state variable for LEDs (16 bits)
+uint16_t leds = 0;
+bool enteredCode[16] = {0};
+
+// --- Debouncing Variables ---
+const int NUM_BUTTONS = 16;
+bool previousButtonState[NUM_BUTTONS] = {false}; // Store previous state (false = LOW/released)
+unsigned long lastDebounceTime[NUM_BUTTONS] = {0}; // Store time of last transition
+const unsigned long DEBOUNCE_DELAY = 50; // milliseconds
 
 
 
@@ -79,39 +88,33 @@ void readCodeResCharacteristic();
 void writeButtonStatusCharacteristic();
 void scanForServer();
 bool connectToServer();
-void updateButtonStatus();
 bool checkCode();
 void unlockBox();
-void setupPins();
-int scanButtons();
-void shiftBit(bool bitValue);
-void latchData();
-void updateShiftRegister();
+
+// Fonctions Shift-Register
+void getButtons();
+void clockPulseSRCLK();
+void pulseRCLK();
+void shiftBit(int bit);
+void clearRegisters();
+void setupMultiplexers();
+void setupShiftRegister();
+void shitfAndStoreTab();
 
 void setup() {
     Serial.begin(115200);
     pinMode(unlockPin, OUTPUT);
     digitalWrite(unlockPin, LOW);
 
-    for (int i = 0; i < 15; i++) {
-        pinMode(buttonPins[i], INPUT_PULLUP);
-    }
-
     setupBLE();
-    Serial.begin(115200);
-    setupPins();
-
-    // setup shift-register
-    pinMode(DATA_PIN, OUTPUT);
-    pinMode(CLOCK_PIN, OUTPUT);
-    pinMode(LATCH_PIN, OUTPUT);
     
-    // Initialiser le shift register
-    digitalWrite(LATCH_PIN, LOW);
-    digitalWrite(CLOCK_PIN, LOW);
-    digitalWrite(DATA_PIN, LOW);
+    Serial.println("ESP32 Shift Register & MUX Control Initialized");
+    setupMultiplexers();
+    setupShiftRegister();
 }
 
+
+// à changer
 void loop() {
     
     if (!connected) {
@@ -126,22 +129,17 @@ void loop() {
         readCodeResCharacteristic();
     }
 
-    updateButtonStatus();
-
     if (checkCode()) {
         unlockBox();
     }
 
     delay(250);
-    flag_button = scanButtons();
-    if (flag_button == 1){
-        delay(20);
-    }
-    delay(50); // 20 fois par seconde
 
     // partie shift-register
-    updateShiftRegister();
-    delay(100); // Mise à jour périodique
+    // Read buttons and update LED state
+    getButtons();
+    // Small delay to prevent busy-looping and allow serial buffer to empty
+    delay(10);
 }
 
 void setupBLE() {
@@ -204,20 +202,6 @@ void writeButtonStatusCharacteristic() {
 }
 
 // Deutsche Qualität
-void updateButtonStatus() {
-    for (int i = 0; i < 15; i++) {
-        enteredCode[i] = digitalRead(buttonPins[i]) == LOW ? 1 : 0;
-    }
-
-    // Debugging: Print enteredCode
-    Serial.print("Entered code: ");
-    for (int i = 0; i < 15; i++) {
-        Serial.print(enteredCode[i]);
-        Serial.print(" ");
-    }
-    Serial.println();
-}
-
 bool checkCode() {
     for (int i = 0; i < 15; i++) {
         if (enteredCode[i] != codeRes[i]) {
@@ -234,58 +218,147 @@ void unlockBox() {
     digitalWrite(unlockPin, LOW);
 }
 
-void setupPins() {
-    pinMode(S0, OUTPUT);
-    pinMode(S1, OUTPUT);
-    pinMode(S2, OUTPUT);
-    pinMode(OUT1, INPUT);
-    pinMode(OUT2, INPUT);
-}
 
-int scanButtons() {
-    flag_button = 0;
+
+//------------------------------------------------------------------------------
+void getButtons() {
+    bool stateChanged = false;
+  
     for (int i = 0; i < 8; i++) {
-        digitalWrite(S0, i & 0x01);
-        digitalWrite(S1, (i >> 1) & 0x01);
-        digitalWrite(S2, (i >> 2) & 0x01);
-        
-        delayMicroseconds(10); // Petit délai pour la stabilité
-        
-        if (digitalRead(OUT1) == HIGH) {
-            buttonStates[i] ^= buttonStates[i];
-            flag_button = 1;            // bouton appuyé, attendre que le flag_button repasse à 0 pour appuyer.
-        }
-        
-        if (digitalRead(OUT2) == HIGH) {
-            buttonStates[8 + i] ^= buttonStates[8 + i];
-            flag_button = 1;           // bouton appuyé, attendre que le flag_button repasse à 0 pour appuyer.
-        }
+      // Select MUX channel
+      digitalWrite(S0, (i >> 0) & 0x1);
+      digitalWrite(S1, (i >> 1) & 0x1);
+      digitalWrite(S2, (i >> 2) & 0x1);
+      delayMicroseconds(50); // Allow MUX outputs to settle
+  
+      // Read raw states (Assuming HIGH means pressed)
+      bool currentButtonState1 = digitalRead(OUT1);
+      bool currentButtonState2 = digitalRead(OUT2);
+  
+      // --- Debounce and Process Button 1 (index i) ---
+      if ((millis() - lastDebounceTime[i]) > DEBOUNCE_DELAY) {
+          // Check for a press (transition from LOW to HIGH)
+          if (currentButtonState1 == HIGH && previousButtonState[i] == LOW) {
+              leds ^= (1 << i); // Toggle the i-th bit
+              enteredCode[i] ^= 1;
+              Serial.printf("Button %d pressed. LED mask: 0x%04X\n", i, leds);
+              stateChanged = true;
+              lastDebounceTime[i] = millis(); // Record time of press detection
+          }
+      }
+      // Update previous state only if stable reading differs (or always update after check)
+      // Simple approach: update previous state regardless after check
+       previousButtonState[i] = currentButtonState1;
+  
+  
+      // --- Debounce and Process Button 2 (index i + 8) ---
+      int buttonIndex2 = i + 8;
+       if ((millis() - lastDebounceTime[buttonIndex2]) > DEBOUNCE_DELAY) {
+          // Check for a press (transition from LOW to HIGH)
+          if (currentButtonState2 == HIGH && previousButtonState[buttonIndex2] == LOW) {
+              leds ^= (1 << buttonIndex2); // Toggle the (i+8)-th bit
+              enteredCode[buttonIndex2] ^= 1;
+              Serial.printf("Button %d pressed. LED mask: 0x%04X\n", buttonIndex2, leds);
+              stateChanged = true;
+              lastDebounceTime[buttonIndex2] = millis(); // Record time of press detection
+          }
+       }
+       // Update previous state
+       previousButtonState[buttonIndex2] = currentButtonState2;
     }
-    return flag_button;
+  
+    // If any button press was detected and processed, update the LEDs
+    if (stateChanged) {
+      // shiftAndStoreValue(leds);
+      shitfAndStoreTab();
+    }
 }
 
 
 // Partie pour le shift-register
-// Fonction pour décaler un bit dans le shift register
-void shiftBit(bool bitValue) {
-    digitalWrite(DATA_PIN, bitValue);  // Mettre la valeur sur DATA
-    digitalWrite(CLOCK_PIN, HIGH);     // Cycle d'horloge
-    delayMicroseconds(5);        // delay pour qu'on n'écrive pas les 2 d'un coup
-    digitalWrite(CLOCK_PIN, LOW);
+// Shifts a single bit into the register
+void shiftBit(int bit) {
+    digitalWrite(SER, bit ? HIGH : LOW);
+    clockPulseSRCLK(); // Pulse Shift Register Clock
 }
 
-// Fonction pour verrouiller les données dans le registre
-void latchData() {
-    digitalWrite(LATCH_PIN, HIGH);
-    delayMicroseconds(5);        // delay pour qu'on n'écrive pas les 2 d'un coup
-    digitalWrite(LATCH_PIN, LOW);
+
+// Pulses the Shift Register Clock (SRCLK / SHCP)
+void clockPulseSRCLK() {
+    digitalWrite(SRCLK, HIGH);
+    delayMicroseconds(10); // Adjust timing if needed
+    digitalWrite(SRCLK, LOW);
+    delayMicroseconds(10);
 }
 
-// Fonction pour envoyer les états des boutons au shift register
-void updateShiftRegister() {
-    digitalWrite(LATCH_PIN, LOW); // Préparation
-    for (int i = 0; i < 15; i++) {
-        shiftBit(buttonStates[i]); // Envoi des bits des boutons
+// Pulses the Register Clock / Latch (RCLK / STCP)
+void pulseRCLK() {
+    digitalWrite(RCLK, HIGH);
+    delayMicroseconds(10); // Adjust timing if needed
+    digitalWrite(RCLK, LOW);
+    delayMicroseconds(10);
+}
+
+// Clears the shift registers (sets all outputs LOW)
+void clearRegisters() {
+    digitalWrite(SRCLRbar, LOW);
+    delayMicroseconds(10);
+    digitalWrite(SRCLRbar, HIGH); // Keep HIGH for normal operation
+    pulseRCLK(); // Latch the cleared state to the outputs
+}
+
+
+
+//------------------------------------------------------------------------------
+// Shifts 16 bits (MSB first) and then latches them to the outputs
+// Corrected: Latch only ONCE after all bits are shifted.
+// Corrected: Comment matches code (MSB first)
+// Corrected: Uses uint16_t for clarity
+  
+void shitfAndStoreTab() {
+    for (int i =0; i < 16;i++) {
+      if (enteredCode[i] == true) {
+        shiftBit(1);
+      } else {
+        shiftBit(0);
+      }
     }
-    latchData(); // Verrouillage des valeurs
+  
+    pulseRCLK();
+}
+
+
+
+void setupMultiplexers() {
+    /* Init Multiplexers */
+    pinMode(ENABLE, OUTPUT);
+    pinMode(OUT1, INPUT); // Consider INPUT_PULLDOWN if buttons connect to VCC
+    pinMode(OUT2, INPUT); // Consider INPUT_PULLDOWN if buttons connect to VCC
+    pinMode(S0, OUTPUT);
+    pinMode(S1, OUTPUT);
+    pinMode(S2, OUTPUT);
+    digitalWrite(ENABLE, LOW); // Enable MUX outputs
+}
+
+void setupShiftRegister() {
+      /* Init Shift Registers */
+      pinMode(SER, OUTPUT);
+      pinMode(SRCLK, OUTPUT);
+      pinMode(SRCLRbar, OUTPUT);
+      pinMode(RCLK, OUTPUT);
+      pinMode(OEbar, OUTPUT);
+    
+      // Initial Shift Register State
+      digitalWrite(SRCLK, LOW);
+      digitalWrite(RCLK, LOW);
+      digitalWrite(OEbar, HIGH);    // Disable outputs initially
+      digitalWrite(SRCLRbar, LOW);  // Pulse clear LOW
+      delayMicroseconds(10);
+      digitalWrite(SRCLRbar, HIGH); // Keep HIGH for normal operation
+      digitalWrite(OEbar, LOW);     // Enable outputs
+    
+      Serial.println("Shift registers cleared and enabled.");
+    
+      // Optional: Run LED test once at startup
+      // testLedsInitial(); 
 }
