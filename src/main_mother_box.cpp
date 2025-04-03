@@ -560,7 +560,7 @@ unsigned long timerDelay = 500;
 
 
 // Game State
-enum GameState { CODE_A, WAIT, CODE_B, CODE_RES };
+enum GameState { CODE_A, WAIT, CODE_B};
 GameState currentState = CODE_A;
 unsigned long stateStartTime = 0;
 const unsigned long displayDuration = 5000;
@@ -802,11 +802,6 @@ void handlePostGameMode(){
     server.send(200, "text/plain", "OK");
 }
 
-/* 
-condition de choix : gameMode
-delay + afficher les bons codes selon gameMode
-et vérifier boite fermé ou ouverte
-*/
 
 // ##### Update Game State #####
 void updateGameState() {
@@ -814,40 +809,66 @@ void updateGameState() {
     static unsigned long stateStartTime = 0;
 
     if (gameMode == "codeA") {
-        displayCode(encodedCodeA);
-        if (currentTime - stateStartTime > 1000) { // Délai spécifique pour Code A
-            // Changer le mode après le délai
+        if (digitalRead(IN_CLOSED) == LOW) { // Vérifie si la boîte est fermée
+            displayCode(encodedCodeA);
+        }
+        if (currentTime - stateStartTime > 1000) {
             gameMode = "WAIT";
             stateStartTime = currentTime;
         }
     } 
     else if (gameMode == "WAIT") {
-        if (currentTime - stateStartTime > 2000) { // Délai spécifique pour WAIT
+        if (currentTime - stateStartTime > 2000) {
             gameMode = "codeB";
             stateStartTime = currentTime;
         }
     } 
     else if (gameMode == "codeB") {
-        displayCode(encodedCodeB);
-        if (currentTime - stateStartTime > 1500) { // Délai spécifique pour Code B
+        if (digitalRead(IN_CLOSED) == LOW) { // Vérifie si la boîte est fermée
+            displayCode(encodedCodeB);
+        }
+        if (currentTime - stateStartTime > 1500) {
+            gameMode = "WAIT2";
+            stateStartTime = currentTime;
+        }
+    }
+    else if (gameMode == "WAIT2") {
+        if (currentTime - stateStartTime > 2000) {
             gameMode = "CODE_RES";
             stateStartTime = currentTime;
         }
-    } 
+    }
     else if (gameMode == "CODE_RES") {
         displayCode(codeRes);
-        // Une fois dans cet état, on reste ici et on envoie le signal d'ouverture
     } 
-    else {
-        // Mode par défaut, si gameMode est inconnu
-        Serial.println("Mode inconnu, activation du mode par défaut.");
-        delay(500); // Délai par défaut
+    else if (gameMode == "playing") {
+        if (currentState == CODE_A) {
+            if (digitalRead(IN_CLOSED) == LOW) { // Vérifie si la boîte est fermée
+                displayCode(encodedCodeA);
+            }
+            if (currentTime - stateStartTime > displayDuration) {
+                currentState = WAIT;
+                stateStartTime = currentTime;
+            }
+        } 
+        else if (currentState == WAIT) {
+            if (currentTime - stateStartTime > waitDuration) {
+                currentState = CODE_B;
+                stateStartTime = currentTime;
+            }
+        } 
+        else if (currentState == CODE_B) {
+            if (digitalRead(IN_CLOSED) == LOW) { // Vérifie si la boîte est fermée
+                displayCode(encodedCodeB);
+            }
+            if (currentTime - stateStartTime > displayDuration) {
+                currentState = WAIT;
+                stateStartTime = currentTime;
+            }
+        }
     }
-
-    // Vérification de l'état de la boîte pendant le délai
-    if (digitalRead(IN_CLOSED) == HIGH) {
-        Serial.println("La boîte est ouverte !");
-    } else {
-        Serial.println("La boîte est toujours fermée.");
+    else {
+        Serial.println("Mode inconnu, activation du mode par défaut.");
+        delay(500);
     }
 }
