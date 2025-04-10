@@ -77,8 +77,10 @@ unsigned long lastDebounceTime[NUM_BUTTONS] = {0}; // Store time of last transit
 const unsigned long DEBOUNCE_DELAY = 50; // milliseconds
 bool isBoxUnlocked = false;
 long timeBoxUnlocked = 0;
-const unsigned long UNLOCK_DELAY = 5000;
-
+const unsigned long UNLOCK_DELAY = 1000;
+// --- Vars used in loop ---
+const long waittime = 250;
+long lastBLECheck = 0;
 
 // ____ Fonctions ____
 void setupBLE();
@@ -111,9 +113,7 @@ void setup() {
     
 }
 
-long lastBLECheck = 0;
-long waittime = 250;
-// à changer
+
 void loop() {
     if ((millis() - lastBLECheck) > waittime) {  
         lastBLECheck = millis();
@@ -138,6 +138,8 @@ void loop() {
             Serial.println("\nFermeture de la boîte !\n");
             digitalWrite(unlockPin, LOW);
             isBoxUnlocked = false;
+            enteredCode[15] = false;
+            shitfAndStoreTab();
         }
 
     }
@@ -224,6 +226,9 @@ void unlockBox() {
         digitalWrite(unlockPin, HIGH);
         isBoxUnlocked = true;
         timeBoxUnlocked = millis();
+
+        enteredCode[15] = true;
+        shitfAndStoreTab();
     }
 }
 
