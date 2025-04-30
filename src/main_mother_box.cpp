@@ -12,15 +12,16 @@ CODE codeRes = {false};
 CODE encodedCodeA = {false};
 CODE encodedCodeB = {false};
 CODE buttonStatus = {false};
-String gameMode = "playing";
+CODE codeEmpty = {false};
+String gameMode = "codeResIR";
 
 // ##### Pins #####
 const uint8_t IN_CLOSED = 34;
 const uint8_t OUTPUTS[15] = {4, 13, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33, 5};
 
 // ##### WiFi Credentials #####
-const char* ssid = "La_Boite_Ampoules";
-const char* password = "lejeulalejeu";
+const char* ssid = "La_Boite_à_Ampoules";
+const char* password = "deepRed2024_2025";
 
 WebServer server(80);
 
@@ -80,11 +81,12 @@ box-shadow: 0px 0px 61px 0px rgba(255,217,0,1);}
             <a href="\changeCode" class="link-to-setup">Modifier Code Solution</a>
             <h2>Mode de fonctionnement</h2>
                 <select name="displayMode" id="displayMode" >
-                    <option value="playing">Jeu Normal</option>
+                    <option value="codeResIR">Jeu Normal (code solution affiché en infrarouge)</option>
                     <optgroup label="Modes Alternatifs">
-                        <option value="codeRes">Affichage Code Solution</option>
-                        <option value="A">Affichage Code A</option>
-                        <option value="B">Affichage Code B</option>
+                        <option value="codeAIR">Affichage Code A</option>
+                        <option value="codeBIR">Affichage Code B</option>
+                        <option value="IR+visible">Affichage combinaison code infrarouge et visible</option>
+                        <option value="codeA+B">Affichage de deux code infrarouge en alternance</option>
                     </optgroup>
                 </select>
         </div>
@@ -560,11 +562,10 @@ unsigned long timerDelay = 500;
 
 
 // Game State
-enum GameState { CODE_A, WAIT, CODE_B, CODE_RES};
-GameState currentState = CODE_A;
 unsigned long stateStartTime = 0;
 const unsigned long displayDuration = 5000;
 const unsigned long waitDuration = 2000;
+unsigned long codeLastShownTime = 0;
 
 
 // ##### BLE Callbacks #####
@@ -806,42 +807,111 @@ void handlePostGameMode(){
 // ##### Update Game State #####
 void updateGameState() {
     unsigned long currentTime = millis();
+    const unsigned long DELAY_COMBO_CODE = 180000;
+    const unsigned long DELAY_CODE = 2000;
+    static uint8_t isShowingCode = 0;
+    if (gameMode == "codeA+B") {
+        // Only show code res when lid is closed (visible using IR camera)
+        if (digitalRead(IN_CLOSED) == HIGH) {
+            if (isShowingCode == 3 || isShowingCode == 4) {
+                isShowingCode -= 3;
+                // We can only enter this part of the code when the lid after the box has been opened and closed
+                if (currentTime - codeLastShownTime < DELAY_COMBO_CODE) {
+                    if (isShowingCode == 0) {
+                        displayCode(encodedCodeA);
+                    } else {
+                        displayCode(encodedCodeB);
+                    }
+                }
+            }
+            if (currentTime - codeLastShownTime > DELAY_COMBO_CODE) {
+                codeLastShownTime = currentTime;
+                if (isShowingCode == 1) {
+                    isShowingCode = 0;
+                    displayCode(encodedCodeA);
+                } else {
+                    isShowingCode = 1;
+                    displayCode(encodedCodeB);
+                }
+            }
+        } else {
+            if (isShowingCode != 3 || isShowingCode != 4) {
+                isShowingCode += 3; // We add an arbitrary value to be able to tell when the lid has been opened to avoid rewriting the same code over and over again.
+                displayCode(codeEmpty);
+            }
+        }
+    } else if (gameMode == "codeAIR") {
+        // Only show code A when lid is closed (visible using IR camera)
+        if (digitalRead(IN_CLOSED) == HIGH) {
+            if (isShowingCode == 0) {
+                displayCode(encodedCodeA);
+                isShowingCode = 1;
+            }
+        } else {
+            if (isShowingCode == 1) {
+                displayCode(codeEmpty);
+                isShowingCode = 0;
+            }
+        }
+    } else if (gameMode == "codeBIR") {
+        // Only show code B when lid is closed (visible using IR camera)
+        if (digitalRead(IN_CLOSED) == HIGH) {
+            if (isShowingCode == 0) {
+                displayCode(encodedCodeB);
+                isShowingCode = 1;
+            }
+        } else {
+            if (isShowingCode == 1) {
+                displayCode(codeEmpty);
+                isShowingCode = 0;
+            }
+        }
+    } else if (gameMode == "IR+visible") {
+        if (digitalRead(IN_CLOSED) == HIGH) {
+            if (isShowingCode != 2) {
+                isShowingCode = 2;
+                displayCode(encodedCodeA);
+            }
 
-    // Si l'état actuel est CODE_A
-    if (currentState == CODE_A) {
-        if (digitalRead(IN_CLOSED) == LOW) { // Vérifie si la boîte est fermée
-            displayCode(encodedCodeA);
+            
+        } else {
+            if (isShowingCode == 2) {
+                // We can only enter this part of the code after the box has been closed and opened
+                isShowingCode = 1;
+                displayCode(codeEmpty);
+                codeLastShownTime = currentTime;
+            }
+            if (currentTime - codeLastShownTime > DELAY_CODE) {
+                codeLastShownTime = currentTime;
+                if (isShowingCode == 1) {
+                    isShowingCode = 0;
+                    displayCode(encodedCodeB);
+                } else {
+                    isShowingCode = 1;
+                    displayCode(codeEmpty);
+                }
+            }
         }
-        if (currentTime - stateStartTime > displayDuration) {
-            currentState = WAIT;  // Passe à l'état WAIT après la durée
-            stateStartTime = currentTime;
+    } else {
+        // Default game mode
+        if (gameMode != "codeResIR") {
+            Serial.printf("Unknown game state, defaulting to game state codeResIR\n");
         }
-    }
-    // Si l'état actuel est WAIT
-    else if (currentState == WAIT) {
-        if (currentTime - stateStartTime > waitDuration) {
-            currentState = CODE_B;  // Passe à l'état CODE_B après la durée
-            stateStartTime = currentTime;
+
+        // Only show code Res when lid is closed (visible using IR camera)
+        if (digitalRead(IN_CLOSED) == HIGH) {
+            if (isShowingCode == 0) {
+                displayCode(codeRes);
+                isShowingCode = 1;
+            }
+        } else {
+            if (isShowingCode == 1) {
+                displayCode(codeEmpty);
+                isShowingCode = 0;
+            }
         }
+        
     }
-    // Si l'état actuel est CODE_B
-    else if (currentState == CODE_B) {
-        if (digitalRead(IN_CLOSED) == LOW) { // Vérifie si la boîte est fermée
-            displayCode(encodedCodeB);
-        }
-        if (currentTime - stateStartTime > displayDuration) {
-            currentState = WAIT;  // Passe à l'état WAIT après la durée
-            stateStartTime = currentTime;
-        }
-    }
-    // Si l'état actuel est CODE_RES
-    else if (currentState == CODE_RES) {
-        displayCode(codeRes);  // Affiche le code de réponse
-    }
-    // Gérer le cas de jeu "playing" qui ne fait rien ici, à moins qu'il y ait une logique spécifique
-    else {
-        Serial.println("Mode inconnu, activation du mode par défaut.");
-        delay(500); // Pause pour éviter la surcharge du processeur
-    }
+
 }
 
