@@ -666,6 +666,7 @@ void displayCode(CODE code)
         if (code[i])
         {
             digitalWrite(OUTPUTS[i],LOW);
+            delay(5);
         }
         else if (!code[i])
         {
@@ -735,7 +736,7 @@ void handlePostCodes() {
         encodedCodeA[i] = encodedAArray[i];
         encodedCodeB[i] = encodedBArray[i];
     }
-
+    
     Serial.println("Data received and updated!");
     server.send(200, "text/plain", "OK");
 }
