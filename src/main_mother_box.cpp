@@ -587,7 +587,7 @@ void handleGetCodeRes();
 void handleGetEncodedCodes();
 void handlePostGameMode();
 void handleGetButtonStatus();
-void updateGameState();
+void updateGameState(bool forceUpdate);
 
 
 // ##### Main Setup #####
@@ -601,7 +601,7 @@ void setup() {
 
 void loop() {
     server.handleClient();
-    updateGameState();
+    updateGameState(false);
     transmitCode();
     readButtonStatusCharacteristic();
     
@@ -739,6 +739,7 @@ void handlePostCodes() {
     
     Serial.println("Data received and updated!");
     server.send(200, "text/plain", "OK");
+    updateGameState(true);
 }
 
 void handleGetCodeRes() {
@@ -806,7 +807,7 @@ void handlePostGameMode(){
 
 
 // ##### Update Game State #####
-void updateGameState() {
+void updateGameState(bool forceUpdate) {
     unsigned long currentTime = millis();
     const unsigned long DELAY_COMBO_CODE = 180000;
     const unsigned long DELAY_CODE = 2000;
@@ -814,7 +815,10 @@ void updateGameState() {
     if (gameMode == "codeA+B") {
         // Only show code res when lid is closed (visible using IR camera)
         if (digitalRead(IN_CLOSED) == HIGH) {
-            if (isShowingCode == 3 || isShowingCode == 4) {
+            if (isShowingCode == 3 || isShowingCode == 4 || forceUpdate) {
+                if (forceUpdate && (isShowingCode != 3 || isShowingCode != 4)) {
+                    isShowingCode += 3;
+                }
                 isShowingCode -= 3;
                 // We can only enter this part of the code when the lid after the box has been opened and closed
                 if (currentTime - codeLastShownTime < DELAY_COMBO_CODE) {
@@ -844,7 +848,7 @@ void updateGameState() {
     } else if (gameMode == "codeAIR") {
         // Only show code A when lid is closed (visible using IR camera)
         if (digitalRead(IN_CLOSED) == HIGH) {
-            if (isShowingCode == 0) {
+            if (isShowingCode == 0 || forceUpdate) {
                 displayCode(encodedCodeA);
                 isShowingCode = 1;
             }
@@ -857,7 +861,7 @@ void updateGameState() {
     } else if (gameMode == "codeBIR") {
         // Only show code B when lid is closed (visible using IR camera)
         if (digitalRead(IN_CLOSED) == HIGH) {
-            if (isShowingCode == 0) {
+            if (isShowingCode == 0 || forceUpdate) {
                 displayCode(encodedCodeB);
                 isShowingCode = 1;
             }
@@ -869,7 +873,7 @@ void updateGameState() {
         }
     } else if (gameMode == "IR+visible") {
         if (digitalRead(IN_CLOSED) == HIGH) {
-            if (isShowingCode != 2) {
+            if (isShowingCode != 2 || forceUpdate) {
                 isShowingCode = 2;
                 displayCode(encodedCodeA);
             }
@@ -901,7 +905,7 @@ void updateGameState() {
 
         // Only show code Res when lid is closed (visible using IR camera)
         if (digitalRead(IN_CLOSED) == HIGH) {
-            if (isShowingCode == 0) {
+            if (isShowingCode == 0 || forceUpdate) {
                 displayCode(codeRes);
                 isShowingCode = 1;
             }
