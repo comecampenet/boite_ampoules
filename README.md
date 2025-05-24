@@ -42,6 +42,8 @@ In the project , we used the following hardware:
 
 ### Daughter Box (client, digicode)
 
+[circuit](./Schematic_daugther_box.pdf)
+
 ## Software Requirements
 
 
