@@ -26,7 +26,7 @@ This project in large point of view is a test of an escape game using infrared t
 - User-friendly web interface
 - Playing the game with different modes
 - Options to setup the code easier
-- Monotor the buttons that players push
+- Monitor the buttons that players push
 
 ## Hardware
 
@@ -34,11 +34,11 @@ This project in large point of view is a test of an escape game using infrared t
 In the project , we used the following hardware:
 - **ESP32** (Microcontroller)
 
-### Mother Box (server)
+### Mother Box (server, light bulb box)
 
 - Electronics circuit (this schematic is dupilcated 15 times, one for each light bulb):
 
-![circuit](./circuit.png)
+[circuit](./circuit.png)
 
 ### Daughter Box (client, digicode)
 
@@ -63,9 +63,9 @@ In the project , we used the following hardware:
 
 1. **Clone the repository :**
 ```bash
-git clone https://github.com/yourusername/la-boite-a-ampoules.git
+git clone https://github.com/comecampenet/boite_ampoules.git
 
-cd la-boite-a-ampoules
+cd boite_ampoules
 ```
 2. **Open the project in PlatformIO :**
 - Lauch PlatformIO IDE
@@ -77,6 +77,7 @@ cd la-boite-a-ampoules
 
 4. **Build and upload the code :**
 - Connect your ESP32 board to your computer with a USB cable
+- Use PlatformIO IDE to build and upload the codes to each ESP32 boards
 
 ## Usage
 1. **Connect to the ESP32 Wifi :**
@@ -84,7 +85,7 @@ cd la-boite-a-ampoules
 
 - Open your web browser and navigate to the IP address assigned to your ESP32, often `http://192.168.4.1`
 2. **Control your bulbs :**
-- Juste click on the buttons corresponding to each bulbs to draw your code
+- Just click on the buttons corresponding to each bulbs to draw your code
 3. **Explore the code :**
 - Open the [main](src/main.cpp) file to see the code and feel free to modify it 
 
