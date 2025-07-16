@@ -4,6 +4,8 @@ Welcome to **La Boîte à Ampoules**! This project is part of **DeepRed** by **F
 
 This project in large point of view is a test of an escape game using infrared technologies. The test is based on a box that contains a 3*5 light bulb matrix. When the box is open the lights are all off and when the box is closed the some of the light are turned on, drawing a code useful for the next test. The fact is that the light bulbs are heating when on so it's emmtiting infrared light even when they are turned off. This is the reason why we need to use an infrared camera to read the code when the box is open. The fact is that the code is changing between 2 clue codes, and once the players read it, they need to put the two codes together following the "formulas" given. When they have the solution code, they enter it in the buttons of the daughter box (digicode) and the box does something to handover to the next trial (display a code, open a chest, a door, ...). 
 
+[Report](./Compte_Rendu_final_ProjCo_DeepRed_Campenet_Fauvernier_Schorlé_Veyret.pdf)
+[User Manual](./user_manual_jeu_ampoules_deepred.pdf)
 
 ## Table of Contents
 
